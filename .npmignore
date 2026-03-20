@@ -1,0 +1,9 @@
+node_modules/
+src/
+tsconfig.json
+.gitignore
+.cursor/
+.taskmaster/
+.superset/
+*.md
+!README.md

@@ -1,0 +1,71 @@
+{
+  "name": "synapse-ai",
+  "version": "1.0.0",
+  "description": "Sync your AI instructions, config files, rules, and templates from a single source location to multiple projects.",
+  "keywords": [
+    "ai",
+    "agents",
+    "cli",
+    "sync",
+    "config",
+    "dotfiles",
+    "cursor",
+    "cursor-rules",
+    "instructions",
+    "prompts",
+    "rules",
+    "templates"
+  ],
+  "homepage": "https://github.com/lekterable/synapse-ai#readme",
+  "bugs": {
+    "url": "https://github.com/lekterable/synapse-ai/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lekterable/synapse-ai.git"
+  },
+  "license": "MIT",
+  "author": "Kornel Dubieniecki (https://github.com/lekterable)",
+  "type": "module",
+  "bin": {
+    "synapse": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "format": "prettier \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" README.md vitest.config.ts tsconfig.json tsup.config.ts package.json --write",
+    "format:check": "prettier \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" README.md vitest.config.ts tsconfig.json tsup.config.ts package.json --check",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "pnpm -s validate",
+    "test": "pnpm -s build && vitest run",
+    "types": "tsc --noEmit",
+    "validate": "pnpm -s types && pnpm -s test && pnpm -s format:check"
+  },
+  "dependencies": {
+    "chalk": "5.6.2",
+    "conf": "15.1.0",
+    "diff": "8.0.3",
+    "fs-extra": "11.3.4",
+    "ink": "6.8.0",
+    "meow": "14.1.0",
+    "minimatch": "10.2.4",
+    "react": "19.2.4",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "11.0.4",
+    "@types/node": "25.3.5",
+    "@types/react": "19.2.14",
+    "esbuild": "0.27.3",
+    "prettier": "3.8.1",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=18"
+  }
+}
