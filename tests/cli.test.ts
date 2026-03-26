@@ -2,7 +2,7 @@ import { spawnSync } from 'child_process'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 type CliResult = {
   status?: number
@@ -29,6 +29,7 @@ type SourceSetup = {
 
 const cliPath = join(process.cwd(), 'dist', 'cli.js')
 let sandboxes: string[] = []
+let sandbox: Sandbox
 
 const stripAnsi = (value: string): string =>
   value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
@@ -230,152 +231,610 @@ afterEach(async () => {
   sandboxes = []
 })
 
-describe('synapse init', () => {
-  it('should initialize a scoped project at an explicit root', async () => {
-    const sandbox = await createSandbox()
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'init',
-      '--root',
-      'apps/web',
-      '--scope',
-      'web',
-    ])
-
-    expect(result.status).toBe(0)
-    const metadata = JSON.parse(
-      await readFile(getProjectMetadataPath(sandbox.web), 'utf-8'),
-    ) as {
-      version: number
-      scope?: string
-    }
-    expect(metadata.version).toBe(2)
-    expect(metadata.scope).toBe('web')
+describe('synapse', () => {
+  beforeEach(async () => {
+    sandbox = await createSandbox()
   })
 
-  it('should return a structured error for invalid scope names', async () => {
-    const sandbox = await createSandbox()
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'init',
-      '--root',
-      'apps/web',
-      '--scope',
-      'bad/scope',
-    ])
+  describe('init', () => {
+    it('should initialize a scoped project at an explicit root', async () => {
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'init',
+        '--root',
+        'apps/web',
+        '--scope',
+        'web',
+      ])
 
-    expectError(result, {
-      problem: 'Invalid scope name',
-      reason:
-        'Scope names may only contain letters, numbers, dots, hyphens, and underscores',
-      fix: 'Use letters, numbers, dots, hyphens, or underscores in scope names',
+      expect(result.status).toBe(0)
+      const metadata = JSON.parse(
+        await readFile(getProjectMetadataPath(sandbox.web), 'utf-8'),
+      ) as {
+        version: number
+        scope?: string
+      }
+      expect(metadata.version).toBe(1)
+      expect(metadata.scope).toBe('web')
+    })
+
+    it('should return a structured error for invalid scope names', async () => {
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'init',
+        '--root',
+        'apps/web',
+        '--scope',
+        'bad/scope',
+      ])
+
+      expectError(result, {
+        problem: 'Invalid scope name',
+        reason:
+          'Scope names may only contain letters, numbers, dots, hyphens, and underscores',
+        fix: 'Use letters, numbers, dots, hyphens, or underscores in scope names',
+      })
     })
   })
-})
 
-describe('synapse add', () => {
-  it('should store scoped files under source/scopes and shared files at the source root', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
+  describe('add', () => {
+    it('should store scoped files under source/scopes and shared files at the source root', async () => {
+      const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
 
-    const sourceRoot = getSourceRoot(sandbox.home)
-    expect(
-      await readFile(join(sourceRoot, 'scopes', 'web', scopedFile), 'utf-8'),
-    ).toBe('web-rule-v1\n')
-    expect(await readFile(join(sourceRoot, sharedFile), 'utf-8')).toBe(
-      'shared-agents-v1\n',
-    )
-  })
+      const sourceRoot = getSourceRoot(sandbox.home)
+      expect(
+        await readFile(join(sourceRoot, 'scopes', 'web', scopedFile), 'utf-8'),
+      ).toBe('web-rule-v1\n')
+      expect(await readFile(join(sourceRoot, sharedFile), 'utf-8')).toBe(
+        'shared-agents-v1\n',
+      )
+    })
 
-  it('should resolve add file paths relative to the selected root when --root is provided', async () => {
-    const sandbox = await createSandbox()
-    await writeFile(join(sandbox.web, '.cursorrules'), 'web-rule-v1\n', 'utf-8')
-    expect(
-      runCli(sandbox.repo, sandbox.home, [
-        'init',
-        '--root',
-        'apps/web',
-        '--scope',
-        'web',
-      ]).status,
-    ).toBe(0)
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'add',
-      '.cursorrules',
-      '--root',
-      'apps/web',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(
-      await readFile(
-        join(getSourceRoot(sandbox.home), 'scopes', 'web', '.cursorrules'),
+    it('should resolve add file paths relative to the selected root when --root is provided', async () => {
+      await writeFile(
+        join(sandbox.web, '.cursorrules'),
+        'web-rule-v1\n',
         'utf-8',
-      ),
-    ).toBe('web-rule-v1\n')
-  })
+      )
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
 
-  it('should resolve add file paths relative to nested cwd when no --root is provided', async () => {
-    const sandbox = await createSandbox()
-    await writeFile(join(sandbox.web, 'AGENTS.md'), 'cwd-relative\n', 'utf-8')
-    expect(
-      runCli(sandbox.repo, sandbox.home, [
-        'init',
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        '.cursorrules',
         '--root',
         'apps/web',
-        '--scope',
-        'web',
-      ]).status,
-    ).toBe(0)
+      ])
 
-    const result = runCli(sandbox.webSrc, sandbox.home, [
-      'add',
-      '../AGENTS.md',
-      '--shared',
-    ])
+      expect(result.status).toBe(0)
+      expect(
+        await readFile(
+          join(getSourceRoot(sandbox.home), 'scopes', 'web', '.cursorrules'),
+          'utf-8',
+        ),
+      ).toBe('web-rule-v1\n')
+    })
 
-    expect(result.status).toBe(0)
-    expect(
-      await readFile(join(getSourceRoot(sandbox.home), 'AGENTS.md'), 'utf-8'),
-    ).toBe('cwd-relative\n')
+    it('should resolve add file paths relative to nested cwd when no --root is provided', async () => {
+      await writeFile(join(sandbox.web, 'AGENTS.md'), 'cwd-relative\n', 'utf-8')
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.webSrc, sandbox.home, [
+        'add',
+        '../AGENTS.md',
+        '--shared',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(
+        await readFile(join(getSourceRoot(sandbox.home), 'AGENTS.md'), 'utf-8'),
+      ).toBe('cwd-relative\n')
+    })
+
+    it('should add every file in a directory to the project scope', async () => {
+      await mkdir(join(sandbox.web, '.cursor', 'rules'), { recursive: true })
+      await Promise.all([
+        writeFile(
+          join(sandbox.web, '.cursor', 'rules', 'frontend.md'),
+          'frontend-rule\n',
+          'utf-8',
+        ),
+        writeFile(
+          join(sandbox.web, '.cursor', 'rules', 'backend.md'),
+          'backend-rule\n',
+          'utf-8',
+        ),
+      ])
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        '.cursor',
+        '--root',
+        'apps/web',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Added 2 file(s) to source (scope: web)')
+      expect(
+        await readFile(
+          join(
+            getSourceRoot(sandbox.home),
+            'scopes',
+            'web',
+            '.cursor',
+            'rules',
+            'frontend.md',
+          ),
+          'utf-8',
+        ),
+      ).toBe('frontend-rule\n')
+      expect(
+        await readFile(
+          join(
+            getSourceRoot(sandbox.home),
+            'scopes',
+            'web',
+            '.cursor',
+            'rules',
+            'backend.md',
+          ),
+          'utf-8',
+        ),
+      ).toBe('backend-rule\n')
+    })
+
+    it('should skip ignored files when adding a directory', async () => {
+      await mkdir(join(sandbox.web, 'templates', 'node_modules'), {
+        recursive: true,
+      })
+      await Promise.all([
+        writeFile(
+          join(sandbox.web, 'templates', 'prompt.md'),
+          'shared-prompt\n',
+          'utf-8',
+        ),
+        writeFile(
+          join(sandbox.web, 'templates', 'node_modules', 'ignored.txt'),
+          'ignored\n',
+          'utf-8',
+        ),
+      ])
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        'templates',
+        '--root',
+        'apps/web',
+        '--shared',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Added 1 file(s) to source (shared)')
+      expect(
+        await readFile(
+          join(getSourceRoot(sandbox.home), 'templates', 'prompt.md'),
+          'utf-8',
+        ),
+      ).toBe('shared-prompt\n')
+      await expect(
+        readFile(
+          join(
+            getSourceRoot(sandbox.home),
+            'templates',
+            'node_modules',
+            'ignored.txt',
+          ),
+          'utf-8',
+        ),
+      ).rejects.toThrow()
+    })
+
+    it('should return a structured error when the path argument is missing', async () => {
+      const result = runCli(sandbox.web, sandbox.home, ['add'])
+
+      expectError(result, {
+        problem: 'No path specified for add command',
+        reason: 'The add command requires a file or directory path argument',
+        fix: 'Usage: synapse add <path>',
+      })
+    })
   })
 
-  it('should add every file in a directory to the project scope', async () => {
-    const sandbox = await createSandbox()
-    await mkdir(join(sandbox.web, '.cursor', 'rules'), { recursive: true })
-    await Promise.all([
-      writeFile(
+  describe('remove', () => {
+    it('should remove a shared file from the source root', async () => {
+      const { sharedFile } = await initializeScopedProjects(sandbox)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'remove',
+        sharedFile,
+        '--root',
+        'apps/web',
+        '--shared',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Removed 1 file(s) from source (shared)')
+      await expect(
+        readFile(join(getSourceRoot(sandbox.home), sharedFile), 'utf-8'),
+      ).rejects.toThrow()
+    })
+
+    it('should remove every file in a directory from the project scope', async () => {
+      await mkdir(join(sandbox.web, '.cursor', 'rules'), { recursive: true })
+      await Promise.all([
+        writeFile(
+          join(sandbox.web, '.cursor', 'rules', 'frontend.md'),
+          'frontend-rule\n',
+          'utf-8',
+        ),
+        writeFile(
+          join(sandbox.web, '.cursor', 'rules', 'backend.md'),
+          'backend-rule\n',
+          'utf-8',
+        ),
+      ])
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'add',
+          '.cursor',
+          '--root',
+          'apps/web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'remove',
+        '.cursor',
+        '--root',
+        'apps/web',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain(
+        'Removed 2 file(s) from source (scope: web)',
+      )
+      await expect(
+        readFile(
+          join(
+            getSourceRoot(sandbox.home),
+            'scopes',
+            'web',
+            '.cursor',
+            'rules',
+            'frontend.md',
+          ),
+          'utf-8',
+        ),
+      ).rejects.toThrow()
+      await expect(
+        readFile(
+          join(
+            getSourceRoot(sandbox.home),
+            'scopes',
+            'web',
+            '.cursor',
+            'rules',
+            'backend.md',
+          ),
+          'utf-8',
+        ),
+      ).rejects.toThrow()
+    })
+
+    it('should return a structured error when the path argument is missing', async () => {
+      const result = runCli(sandbox.web, sandbox.home, ['remove'])
+
+      expectError(result, {
+        problem: 'No path specified for remove command',
+        reason: 'The remove command requires a file or directory path argument',
+        fix: 'Usage: synapse remove <path>',
+      })
+    })
+
+    it('should return a structured error when the path does not exist in the selected source layer', async () => {
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'remove',
+        'AGENTS.md',
+        '--root',
+        'apps/web',
+        '--shared',
+      ])
+
+      expectError(result, {
+        problem: 'Cannot remove path: AGENTS.md',
+        reason:
+          'The file or directory does not exist in the selected source layer',
+        fix: 'Check the selected path and use --shared or --scope to target the correct source layer',
+      })
+    })
+  })
+
+  describe('sync', () => {
+    it('should sync scoped files plus the shared fallback for matching scopes', async () => {
+      const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Synced 2 file(s).')
+      expect(
+        await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).toBe('web-rule-v1\n')
+      expect(
+        await readFile(join(sandbox.webConsumer, sharedFile), 'utf-8'),
+      ).toBe('shared-agents-v1\n')
+    })
+
+    it('should not sync files from other scopes', async () => {
+      const { sharedFile } = await initializeScopedProjects(sandbox)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/mobile',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Synced 1 file(s).')
+      expect(await readFile(join(sandbox.mobile, sharedFile), 'utf-8')).toBe(
+        'shared-agents-v1\n',
+      )
+      await expect(
+        readFile(join(sandbox.mobile, '.cursorrules'), 'utf-8'),
+      ).rejects.toThrow()
+    })
+
+    it('should use the nearest synapse root when running from a nested directory', async () => {
+      const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
+
+      const result = runCli(sandbox.webConsumerSrc, sandbox.home, [
+        'sync',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(
+        await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).toBe('web-rule-v1\n')
+      expect(
+        await readFile(join(sandbox.webConsumer, sharedFile), 'utf-8'),
+      ).toBe('shared-agents-v1\n')
+    })
+
+    it('should require --yes in non-interactive mode when changes are pending', async () => {
+      await initializeScopedProjects(sandbox)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+      ])
+
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain(
+        'Confirmation requires interactive terminal',
+      )
+    })
+
+    it('should not mutate files or metadata with --dry-run', async () => {
+      const { scopedFile } = await initializeScopedProjects(sandbox)
+      const metadataPath = getProjectMetadataPath(sandbox.webConsumer)
+      const metadataBefore = await readFile(metadataPath, 'utf-8')
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--dry-run',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Would sync 2 file(s).')
+      await expect(
+        readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).rejects.toThrow()
+      const metadataAfter = await readFile(metadataPath, 'utf-8')
+      expect(metadataAfter).toBe(metadataBefore)
+    })
+
+    it('should keep local changes with --strategy ours', async () => {
+      const { scopedFile } = await initializeScopedProjects(sandbox)
+      await prepareConflictScenario(sandbox, scopedFile)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--strategy',
+        'ours',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('No files selected for sync.')
+      expect(result.stdout).toContain('Skipped 1 conflict file(s).')
+      expect(
+        await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).toBe('local-change\n')
+    })
+
+    it('should overwrite local changes with --strategy theirs and create a backup', async () => {
+      const { scopedFile } = await initializeScopedProjects(sandbox)
+      await prepareConflictScenario(sandbox, scopedFile)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--strategy',
+        'theirs',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Synced 1 file(s).')
+      expect(
+        await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).toBe('web-rule-v2\n')
+
+      const backups = await readdir(join(sandbox.home, '.synapse', 'backups'))
+      expect(backups.length).toBeGreaterThan(0)
+    })
+
+    it('should treat --strategy ask with --yes as source-wins', async () => {
+      const { scopedFile } = await initializeScopedProjects(sandbox)
+      await prepareConflictScenario(sandbox, scopedFile)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--strategy',
+        'ask',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(
+        await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).toBe('web-rule-v2\n')
+    })
+
+    it('should return a structured error when no synapse project can be found', async () => {
+      const result = runCli(sandbox.scratch, sandbox.home, ['sync', '--yes'])
+
+      expectError(result, {
+        problem: 'No synapse project found',
+        reason:
+          'Synapse could not find a .synapse.json in this directory or any parent directory',
+        fix: 'Run "synapse init" here, or pass --root <path> to target another project',
+      })
+    })
+
+    it('should return a structured error for an invalid conflict strategy', async () => {
+      const result = runCli(sandbox.scratch, sandbox.home, [
+        'sync',
+        '--strategy',
+        'broken',
+      ])
+
+      expectError(result, {
+        problem: 'Invalid conflict strategy',
+        reason: 'Invalid --strategy value: broken',
+        fix: 'Use one of: ask, theirs, ours, skip',
+      })
+    })
+  })
+
+  describe('nested project ownership guard', () => {
+    it('should block adding a nested project file from the parent project root', async () => {
+      await initializeParentAndNestedProjects(sandbox)
+      await writeFile(
+        join(sandbox.web, '.cursorrules'),
+        'nested-rule\n',
+        'utf-8',
+      )
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        'apps/web/.cursorrules',
+      ])
+
+      expectError(result, {
+        problem: 'Cannot add path from nested synapse project boundary',
+        reason:
+          'File "apps/web/.cursorrules" belongs to nested synapse project "apps/web"',
+        fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      })
+    })
+
+    it('should block adding a nested project directory from the parent project root', async () => {
+      await initializeParentAndNestedProjects(sandbox)
+      await mkdir(join(sandbox.web, '.cursor', 'rules'), { recursive: true })
+      await writeFile(
         join(sandbox.web, '.cursor', 'rules', 'frontend.md'),
-        'frontend-rule\n',
+        'nested-rule\n',
         'utf-8',
-      ),
-      writeFile(
-        join(sandbox.web, '.cursor', 'rules', 'backend.md'),
-        'backend-rule\n',
-        'utf-8',
-      ),
-    ])
-    expect(
-      runCli(sandbox.repo, sandbox.home, [
-        'init',
-        '--root',
-        'apps/web',
-        '--scope',
-        'web',
-      ]).status,
-    ).toBe(0)
+      )
 
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'add',
-      '.cursor',
-      '--root',
-      'apps/web',
-    ])
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        'apps/web/.cursor',
+      ])
 
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Added 2 file(s) to source (scope: web)')
-    expect(
-      await readFile(
+      expectError(result, {
+        problem: 'Cannot add path from nested synapse project boundary',
+        reason:
+          'File "apps/web/.cursor/rules/frontend.md" belongs to nested synapse project "apps/web"',
+        fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      })
+    })
+
+    it('should block removing a nested project directory from the parent project root', async () => {
+      await initializeParentAndNestedProjects(sandbox)
+      await mkdir(
+        join(getSourceRoot(sandbox.home), 'scopes', 'web', '.cursor', 'rules'),
+        {
+          recursive: true,
+        },
+      )
+      await writeFile(
         join(
           getSourceRoot(sandbox.home),
           'scopes',
@@ -384,423 +843,117 @@ describe('synapse add', () => {
           'rules',
           'frontend.md',
         ),
+        'nested-rule\n',
         'utf-8',
-      ),
-    ).toBe('frontend-rule\n')
-    expect(
-      await readFile(
-        join(
-          getSourceRoot(sandbox.home),
-          'scopes',
-          'web',
-          '.cursor',
-          'rules',
-          'backend.md',
-        ),
-        'utf-8',
-      ),
-    ).toBe('backend-rule\n')
-  })
+      )
 
-  it('should skip ignored files when adding a directory', async () => {
-    const sandbox = await createSandbox()
-    await mkdir(join(sandbox.web, 'templates', 'node_modules'), {
-      recursive: true,
-    })
-    await Promise.all([
-      writeFile(
-        join(sandbox.web, 'templates', 'prompt.md'),
-        'shared-prompt\n',
-        'utf-8',
-      ),
-      writeFile(
-        join(sandbox.web, 'templates', 'node_modules', 'ignored.txt'),
-        'ignored\n',
-        'utf-8',
-      ),
-    ])
-    expect(
-      runCli(sandbox.repo, sandbox.home, [
-        'init',
-        '--root',
-        'apps/web',
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'remove',
+        'apps/web/.cursor',
         '--scope',
         'web',
-      ]).status,
-    ).toBe(0)
+      ])
 
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'add',
-      'templates',
-      '--root',
-      'apps/web',
-      '--shared',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Added 1 file(s) to source (shared)')
-    expect(
-      await readFile(
-        join(getSourceRoot(sandbox.home), 'templates', 'prompt.md'),
-        'utf-8',
-      ),
-    ).toBe('shared-prompt\n')
-    await expect(
-      readFile(
-        join(
-          getSourceRoot(sandbox.home),
-          'templates',
-          'node_modules',
-          'ignored.txt',
-        ),
-        'utf-8',
-      ),
-    ).rejects.toThrow()
-  })
-
-  it('should return a structured error when the path argument is missing', async () => {
-    const sandbox = await createSandbox()
-    const result = runCli(sandbox.web, sandbox.home, ['add'])
-
-    expectError(result, {
-      problem: 'No path specified for add command',
-      reason: 'The add command requires a file or directory path argument',
-      fix: 'Usage: synapse add <path>',
+      expectError(result, {
+        problem: 'Cannot remove path from nested synapse project boundary',
+        reason:
+          'File "apps/web/.cursor" belongs to nested synapse project "apps/web"',
+        fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      })
     })
-  })
-})
 
-describe('synapse sync', () => {
-  it('should sync scoped files plus the shared fallback for matching scopes', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
+    it('should block a targeted sync into a nested project from the parent project root', async () => {
+      await initializeParentAndNestedProjects(sandbox)
+      await writeSourceFile(
+        sandbox.home,
+        'apps/web/.cursorrules',
+        'nested-rule\n',
+      )
 
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/web-consumer',
-      '--yes',
-    ])
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        'apps/web/.cursorrules',
+        '--yes',
+      ])
 
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Synced 2 file(s).')
-    expect(await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8')).toBe(
-      'web-rule-v1\n',
-    )
-    expect(await readFile(join(sandbox.webConsumer, sharedFile), 'utf-8')).toBe(
-      'shared-agents-v1\n',
-    )
-  })
+      expectError(result, {
+        problem: 'Cannot sync across nested synapse project boundary',
+        reason:
+          'File "apps/web/.cursorrules" belongs to nested synapse project "apps/web"',
+        fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      })
+    })
 
-  it('should not sync files from other scopes', async () => {
-    const sandbox = await createSandbox()
-    const { sharedFile } = await initializeScopedProjects(sandbox)
+    it('should fail closed on full sync when the parent source contains nested project files', async () => {
+      await initializeParentAndNestedProjects(sandbox)
+      await writeSourceFile(sandbox.home, 'AGENTS.md', 'shared-root\n')
+      await writeSourceFile(
+        sandbox.home,
+        'apps/web/.cursorrules',
+        'nested-rule\n',
+      )
 
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/mobile',
-      '--yes',
-    ])
+      const result = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
 
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Synced 1 file(s).')
-    expect(await readFile(join(sandbox.mobile, sharedFile), 'utf-8')).toBe(
-      'shared-agents-v1\n',
-    )
-    await expect(
-      readFile(join(sandbox.mobile, '.cursorrules'), 'utf-8'),
-    ).rejects.toThrow()
-  })
-
-  it('should use the nearest synapse root when running from a nested directory', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
-
-    const result = runCli(sandbox.webConsumerSrc, sandbox.home, [
-      'sync',
-      '--yes',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8')).toBe(
-      'web-rule-v1\n',
-    )
-    expect(await readFile(join(sandbox.webConsumer, sharedFile), 'utf-8')).toBe(
-      'shared-agents-v1\n',
-    )
-  })
-
-  it('should require --yes in non-interactive mode when changes are pending', async () => {
-    const sandbox = await createSandbox()
-    await initializeScopedProjects(sandbox)
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/web-consumer',
-    ])
-
-    expect(result.status).toBe(1)
-    expect(result.stderr).toContain(
-      'Confirmation requires interactive terminal',
-    )
-  })
-
-  it('should not mutate files or metadata with --dry-run', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile } = await initializeScopedProjects(sandbox)
-    const metadataPath = getProjectMetadataPath(sandbox.webConsumer)
-    const metadataBefore = await readFile(metadataPath, 'utf-8')
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/web-consumer',
-      '--dry-run',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Would sync 2 file(s).')
-    await expect(
-      readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
-    ).rejects.toThrow()
-    const metadataAfter = await readFile(metadataPath, 'utf-8')
-    expect(metadataAfter).toBe(metadataBefore)
-  })
-
-  it('should keep local changes with --strategy ours', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile } = await initializeScopedProjects(sandbox)
-    await prepareConflictScenario(sandbox, scopedFile)
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/web-consumer',
-      '--strategy',
-      'ours',
-      '--yes',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('No files selected for sync.')
-    expect(result.stdout).toContain('Skipped 1 conflict file(s).')
-    expect(await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8')).toBe(
-      'local-change\n',
-    )
-  })
-
-  it('should overwrite local changes with --strategy theirs and create a backup', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile } = await initializeScopedProjects(sandbox)
-    await prepareConflictScenario(sandbox, scopedFile)
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/web-consumer',
-      '--strategy',
-      'theirs',
-      '--yes',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Synced 1 file(s).')
-    expect(await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8')).toBe(
-      'web-rule-v2\n',
-    )
-
-    const backups = await readdir(join(sandbox.home, '.synapse', 'backups'))
-    expect(backups.length).toBeGreaterThan(0)
-  })
-
-  it('should treat --strategy ask with --yes as source-wins', async () => {
-    const sandbox = await createSandbox()
-    const { scopedFile } = await initializeScopedProjects(sandbox)
-    await prepareConflictScenario(sandbox, scopedFile)
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      '--root',
-      'apps/web-consumer',
-      '--strategy',
-      'ask',
-      '--yes',
-    ])
-
-    expect(result.status).toBe(0)
-    expect(await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8')).toBe(
-      'web-rule-v2\n',
-    )
-  })
-
-  it('should return a structured error when no synapse project can be found', async () => {
-    const sandbox = await createSandbox()
-    const result = runCli(sandbox.scratch, sandbox.home, ['sync', '--yes'])
-
-    expectError(result, {
-      problem: 'No synapse project found',
-      reason:
-        'Synapse could not find a .synapse.json in this directory or any parent directory',
-      fix: 'Run "synapse init" here, or pass --root <path> to target another project',
+      expectError(result, {
+        problem: 'Cannot sync across nested synapse project boundary',
+        reason:
+          'File "apps/web/.cursorrules" belongs to nested synapse project "apps/web"',
+        fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      })
+      await expect(
+        readFile(join(sandbox.repo, 'AGENTS.md'), 'utf-8'),
+      ).rejects.toThrow()
     })
   })
 
-  it('should return a structured error for an invalid conflict strategy', async () => {
-    const sandbox = await createSandbox()
-    const result = runCli(sandbox.scratch, sandbox.home, [
-      'sync',
-      '--strategy',
-      'broken',
-    ])
+  describe('link', () => {
+    it('should return a structured error when the path is not a directory', async () => {
+      const invalidPath = join(sandbox.repo, 'not-a-directory.txt')
+      await writeFile(invalidPath, 'x', 'utf-8')
 
-    expectError(result, {
-      problem: 'Invalid conflict strategy',
-      reason: 'Invalid --strategy value: broken',
-      fix: 'Use one of: ask, theirs, ours, skip',
-    })
-  })
-})
+      const result = runCli(sandbox.repo, sandbox.home, ['link', invalidPath])
 
-describe('nested project ownership guard', () => {
-  it('should block adding a nested project file from the parent project root', async () => {
-    const sandbox = await createSandbox()
-    await initializeParentAndNestedProjects(sandbox)
-    await writeFile(join(sandbox.web, '.cursorrules'), 'nested-rule\n', 'utf-8')
-
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'add',
-      'apps/web/.cursorrules',
-    ])
-
-    expectError(result, {
-      problem: 'Cannot add path from nested synapse project boundary',
-      reason:
-        'File "apps/web/.cursorrules" belongs to nested synapse project "apps/web"',
-      fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      expectError(result, {
+        problem: `Cannot link path: ${invalidPath}`,
+        reason: 'The specified path is not a directory',
+        fix: 'Pass a project directory path to link',
+      })
     })
   })
 
-  it('should block adding a nested project directory from the parent project root', async () => {
-    const sandbox = await createSandbox()
-    await initializeParentAndNestedProjects(sandbox)
-    await mkdir(join(sandbox.web, '.cursor', 'rules'), { recursive: true })
-    await writeFile(
-      join(sandbox.web, '.cursor', 'rules', 'frontend.md'),
-      'nested-rule\n',
-      'utf-8',
-    )
+  describe('cli surface', () => {
+    it('should print help and exit successfully', async () => {
+      const result = runCli(sandbox.repo, sandbox.home, ['--help'])
 
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'add',
-      'apps/web/.cursor',
-    ])
-
-    expectError(result, {
-      problem: 'Cannot add path from nested synapse project boundary',
-      reason:
-        'File "apps/web/.cursor/rules/frontend.md" belongs to nested synapse project "apps/web"',
-      fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      expect(result.status).toBe(0)
+      expect(result.stderr).toBe('')
+      expect(result.stdout).toContain('Usage')
+      expect(result.stdout).toContain('--root, -r <path>')
+      expect(result.stdout).toContain('--shared')
+      expect(result.stdout).toContain('add <path>')
+      expect(result.stdout).toContain('remove <path>')
     })
-  })
 
-  it('should block a targeted sync into a nested project from the parent project root', async () => {
-    const sandbox = await createSandbox()
-    await initializeParentAndNestedProjects(sandbox)
-    await writeSourceFile(
-      sandbox.home,
-      'apps/web/.cursorrules',
-      'nested-rule\n',
-    )
+    it('should print the version and exit successfully', async () => {
+      const packageJson = JSON.parse(
+        await readFile(join(process.cwd(), 'package.json'), 'utf-8'),
+      ) as { version: string }
+      const result = runCli(sandbox.repo, sandbox.home, ['--version'])
 
-    const result = runCli(sandbox.repo, sandbox.home, [
-      'sync',
-      'apps/web/.cursorrules',
-      '--yes',
-    ])
-
-    expectError(result, {
-      problem: 'Cannot sync across nested synapse project boundary',
-      reason:
-        'File "apps/web/.cursorrules" belongs to nested synapse project "apps/web"',
-      fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
+      expect(result.status).toBe(0)
+      expect(result.stderr).toBe('')
+      expect(result.stdout.trim()).toBe(packageJson.version)
     })
-  })
 
-  it('should fail closed on full sync when the parent source contains nested project files', async () => {
-    const sandbox = await createSandbox()
-    await initializeParentAndNestedProjects(sandbox)
-    await writeSourceFile(sandbox.home, 'AGENTS.md', 'shared-root\n')
-    await writeSourceFile(
-      sandbox.home,
-      'apps/web/.cursorrules',
-      'nested-rule\n',
-    )
+    it('should return a structured error for unknown commands', async () => {
+      const result = runCli(sandbox.repo, sandbox.home, ['does-not-exist'])
 
-    const result = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
-
-    expectError(result, {
-      problem: 'Cannot sync across nested synapse project boundary',
-      reason:
-        'File "apps/web/.cursorrules" belongs to nested synapse project "apps/web"',
-      fix: 'Run the command from the nested project root, or use --root <nested-project> instead',
-    })
-    await expect(
-      readFile(join(sandbox.repo, 'AGENTS.md'), 'utf-8'),
-    ).rejects.toThrow()
-  })
-})
-
-describe('synapse link', () => {
-  it('should return a structured error when the path is not a directory', async () => {
-    const sandbox = await createSandbox()
-    const invalidPath = join(sandbox.repo, 'not-a-directory.txt')
-    await writeFile(invalidPath, 'x', 'utf-8')
-
-    const result = runCli(sandbox.repo, sandbox.home, ['link', invalidPath])
-
-    expectError(result, {
-      problem: `Cannot link path: ${invalidPath}`,
-      reason: 'The specified path is not a directory',
-      fix: 'Pass a project directory path to link',
-    })
-  })
-})
-
-describe('synapse cli surface', () => {
-  it('should print help and exit successfully', async () => {
-    const sandbox = await createSandbox()
-    const result = runCli(sandbox.repo, sandbox.home, ['--help'])
-
-    expect(result.status).toBe(0)
-    expect(result.stderr).toBe('')
-    expect(result.stdout).toContain('Usage')
-    expect(result.stdout).toContain('--root, -r <path>')
-    expect(result.stdout).toContain('--shared')
-    expect(result.stdout).toContain('add <path>')
-  })
-
-  it('should print the version and exit successfully', async () => {
-    const sandbox = await createSandbox()
-    const packageJson = JSON.parse(
-      await readFile(join(process.cwd(), 'package.json'), 'utf-8'),
-    ) as { version: string }
-    const result = runCli(sandbox.repo, sandbox.home, ['--version'])
-
-    expect(result.status).toBe(0)
-    expect(result.stderr).toBe('')
-    expect(result.stdout.trim()).toBe(packageJson.version)
-  })
-
-  it('should return a structured error for unknown commands', async () => {
-    const sandbox = await createSandbox()
-    const result = runCli(sandbox.repo, sandbox.home, ['does-not-exist'])
-
-    expectError(result, {
-      problem: 'Unknown command: does-not-exist',
-      reason: 'The command is not recognized by synapse',
-      fix: 'Run "synapse --help" to see available commands',
+      expectError(result, {
+        problem: 'Unknown command: does-not-exist',
+        reason: 'The command is not recognized by synapse',
+        fix: 'Run "synapse --help" to see available commands',
+      })
     })
   })
 })

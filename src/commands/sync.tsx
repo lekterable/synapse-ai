@@ -19,6 +19,7 @@ import {
 } from '../sync-engine'
 import {
   ensureSourceDir,
+  removeSourcePath,
   resolveEffectiveSourceFile,
   validateScopeName,
 } from '../source'
@@ -153,7 +154,7 @@ const resolveRequiredProjectContext = (
   return context!
 }
 
-const parseAddTargetScope = (
+const parseSourceTargetScope = (
   metadataScope: string | undefined,
   flags: { scope?: string; shared: boolean },
 ): string | undefined => {
@@ -363,7 +364,7 @@ const addHandler: CommandHandler = async (input, flags) => {
 
   let targetScope: string | undefined
   try {
-    targetScope = parseAddTargetScope(metadata.scope, flags)
+    targetScope = parseSourceTargetScope(metadata.scope, flags)
   } catch (error) {
     showError({
       problem: 'Invalid add target',
@@ -405,6 +406,95 @@ const addHandler: CommandHandler = async (input, flags) => {
         'Ensure the path exists inside the selected project, contains addable files, and use --shared or --scope appropriately',
     })
   }
+}
+
+const removeHandler: CommandHandler = async (input, flags) => {
+  if (input.length === 0) {
+    showError({
+      problem: 'No path specified for remove command',
+      reason: 'The remove command requires a file or directory path argument',
+      solution: 'Usage: synapse remove <path>',
+    })
+    return
+  }
+
+  if (input.length > 1) {
+    showError({
+      problem: 'Too many arguments for remove command',
+      reason: 'The remove command accepts exactly one file or directory path',
+      solution: 'Usage: synapse remove <path>',
+    })
+    return
+  }
+
+  const context = resolveRequiredProjectContext(flags.root)
+  const { projectRoot, configManager, metadata } = context
+  const file = input[0]
+
+  let targetScope: string | undefined
+  try {
+    targetScope = parseSourceTargetScope(metadata.scope, flags)
+  } catch (error) {
+    showError({
+      problem: 'Invalid remove target',
+      reason: error instanceof Error ? error.message : String(error),
+      solution:
+        'Use --shared for shared files, or --scope <name> for one scope',
+    })
+    return
+  }
+
+  let relativePath: string
+  try {
+    relativePath = toProjectRelativePath(
+      projectRoot,
+      file,
+      getCommandFileBasePath(projectRoot, flags.root),
+    )
+  } catch (error) {
+    showError({
+      problem: `Cannot remove path: ${file}`,
+      reason: error instanceof Error ? error.message : String(error),
+      solution:
+        'Use a path inside the selected project root and avoid the reserved "scopes/" namespace',
+    })
+    return
+  }
+
+  try {
+    ensureProjectOwnsPath(projectRoot, relativePath)
+  } catch (error) {
+    if (error instanceof NestedProjectOwnershipError) {
+      showNestedProjectOwnershipError(
+        'Cannot remove path from nested synapse project boundary',
+        error,
+      )
+    }
+
+    throw error
+  }
+
+  const sourceRoot = await ensureSourceDir(configManager)
+  const removedCount = await removeSourcePath(
+    sourceRoot,
+    relativePath,
+    targetScope,
+  )
+
+  if (removedCount) {
+    const targetLabel = targetScope ? `scope: ${targetScope}` : 'shared'
+    showSuccess(
+      `Removed ${removedCount} file(s) from source (${targetLabel}): ${relativePath}`,
+    )
+    return
+  }
+
+  showError({
+    problem: `Cannot remove path: ${relativePath}`,
+    reason: 'The file or directory does not exist in the selected source layer',
+    solution:
+      'Check the selected path and use --shared or --scope to target the correct source layer',
+  })
 }
 
 const statusHandler: CommandHandler = async (input, flags) => {
@@ -564,6 +654,7 @@ export const registerSyncCommands = (
 ): void => {
   register('sync', syncHandler)
   register('add', addHandler)
+  register('remove', removeHandler)
   register('status', statusHandler)
   register('diff', diffHandler)
 }

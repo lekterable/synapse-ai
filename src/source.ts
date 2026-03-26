@@ -1,6 +1,6 @@
-import { readdir } from 'fs/promises'
+import { readdir, rm, stat } from 'fs/promises'
 import { mkdirp, pathExists } from 'fs-extra'
-import { join, relative, resolve } from 'path'
+import { dirname, join, relative, resolve } from 'path'
 import { homedir } from 'os'
 import { type ConfigManager } from './config'
 import { normalizeRelativePath, resolveWithin } from './utils/paths'
@@ -65,6 +65,26 @@ const listSourceFiles = async (
   )
 
   return nestedFiles.flat().sort((a, b) => a.localeCompare(b))
+}
+
+const removeEmptyParentDirectories = async (
+  startPath: string,
+  stopPath: string,
+): Promise<void> => {
+  const parentPath = resolve(startPath)
+  const normalizedStopPath = resolve(stopPath)
+
+  if (parentPath === normalizedStopPath) {
+    return
+  }
+
+  const entries = await readdir(parentPath)
+  if (entries.length > 0) {
+    return
+  }
+
+  await rm(parentPath, { recursive: false, force: true })
+  await removeEmptyParentDirectories(dirname(parentPath), normalizedStopPath)
 }
 
 const normalizeScope = (scope: string): string => {
@@ -132,6 +152,15 @@ export const resolveTargetSourcePath = (
     : resolveSharedSourcePath(sourceRoot, relativeFilePath)
 }
 
+const getScopeRootPath = (
+  sourceRoot: string,
+  scope: string | undefined,
+): string => {
+  return scope
+    ? resolveWithin(sourceRoot, join(SCOPES_DIRECTORY, normalizeScope(scope)))
+    : sourceRoot
+}
+
 export const resolveEffectiveSourceFile = async (
   sourceRoot: string,
   relativeFilePath: string,
@@ -197,6 +226,35 @@ export const listEffectiveSourceFiles = async (
   return [...new Map([...sharedEntries, ...scopedEntries]).values()].sort(
     (a, b) => a.file.localeCompare(b.file),
   )
+}
+
+export const removeSourcePath = async (
+  sourceRoot: string,
+  relativeFilePath: string,
+  scope: string | undefined,
+): Promise<number | undefined> => {
+  const targetPath = resolveTargetSourcePath(
+    sourceRoot,
+    relativeFilePath,
+    scope,
+  )
+
+  if (!(await pathExists(targetPath))) {
+    return undefined
+  }
+
+  const targetStats = await stat(targetPath)
+  const fileCount = targetStats.isDirectory()
+    ? (await listSourceFiles(targetPath)).length
+    : 1
+
+  await rm(targetPath, { recursive: true, force: false })
+  await removeEmptyParentDirectories(
+    resolve(targetPath, '..'),
+    getScopeRootPath(sourceRoot, scope),
+  )
+
+  return fileCount
 }
 
 export const ensureSourceDir = async (

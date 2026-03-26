@@ -21,6 +21,7 @@ const cli = meow(
 	  unlink           Remove current synapse project
 	  list             List registered synapse projects
 	  add <path>       Add a project file or directory to source storage
+	  remove <path>    Remove a file or directory from source storage
 	  sync [file]      Sync all tracked files or one file from source
 	  status           Show sync status of tracked files
 	  diff <file>      Show diff between source and project version
@@ -40,6 +41,7 @@ const cli = meow(
 	  $ synapse init --root apps/web --scope web
 	  $ synapse add .cursor
 	  $ synapse add AGENTS.md --shared
+	  $ synapse remove .cursor --root apps/web
 	  $ synapse sync
 	  $ synapse sync --root apps/web --strategy theirs --yes
 `,

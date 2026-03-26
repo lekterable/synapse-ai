@@ -14,7 +14,7 @@ const GlobalConfigSchema = z.object({
 })
 
 const ProjectMetadataSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(1),
   scope: z.string().optional(),
   syncedFiles: z.record(z.string(), z.string()),
   fileHashes: z.record(z.string(), z.string()),
@@ -32,7 +32,7 @@ const defaultGlobalConfig: GlobalConfig = {
 }
 
 const defaultProjectMetadata: ProjectMetadata = {
-  version: 2,
+  version: 1,
   scope: undefined,
   syncedFiles: {},
   fileHashes: {},
@@ -119,7 +119,7 @@ export const createConfigManager = (
     )
     writeFileSync(
       projectMetadataPath,
-      JSON.stringify(validated, undefined, 2),
+      `${JSON.stringify(validated, undefined, 2)}\n`,
       'utf-8',
     )
   }

@@ -126,7 +126,7 @@ const initHandler: CommandHandler = async (input, flags) => {
 
   if (!alreadyInitialized) {
     configManager.setProjectMetadata({
-      version: 2,
+      version: 1,
       scope: nextScope,
     })
   } else if (scopeChanged) {

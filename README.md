@@ -32,7 +32,15 @@ This is the default model:
 
 - `synapse init` creates a Synapse project in the current directory
 - `synapse add <path>` stores that file or directory in the shared source layer
+- `synapse remove <path>` removes that file or directory from the selected source layer
 - `synapse sync` pulls shared files into another initialized project
+
+If you want to stop managing a file or directory from source storage later:
+
+```bash
+synapse remove .editorconfig
+synapse remove .cursor --root apps/web
+```
 
 ## Common Files To Sync
 
@@ -89,24 +97,27 @@ In that setup:
 
 ## Commands
 
-| Command                          | Description                                                                |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| `synapse init`                   | Initialize the current directory as a synapse project                      |
-| `synapse init --root <path>`     | Initialize another directory as a synapse project                          |
-| `synapse init --scope <name>`    | Set a scope for project-specific source overrides                          |
-| `synapse link <path>`            | Register an existing synapse project globally                              |
-| `synapse unlink`                 | Remove the current synapse project                                         |
-| `synapse list`                   | List registered synapse projects                                           |
-| `synapse add <path>`             | Add a file or directory to source storage, defaulting to the project scope |
-| `synapse add <path> --shared`    | Add a file or directory to the shared source root                          |
-| `synapse add <path> --scope <x>` | Add a file or directory to a specific scope                                |
-| `synapse sync`                   | Preview and sync tracked files from source to the current project          |
-| `synapse sync <file>`            | Preview and sync one file                                                  |
-| `synapse sync --dry-run`         | Show sync plan without applying changes                                    |
-| `synapse sync --yes`             | Apply sync without confirmation prompt                                     |
-| `synapse sync --strategy <mode>` | Set conflict strategy (`ask`, `theirs`, `ours`, `skip`)                    |
-| `synapse status`                 | Show sync status of tracked files                                          |
-| `synapse diff <file>`            | Show diff between source and project version                               |
+| Command                             | Description                                                                |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| `synapse init`                      | Initialize the current directory as a synapse project                      |
+| `synapse init --root <path>`        | Initialize another directory as a synapse project                          |
+| `synapse init --scope <name>`       | Set a scope for project-specific source overrides                          |
+| `synapse link <path>`               | Register an existing synapse project globally                              |
+| `synapse unlink`                    | Remove the current synapse project                                         |
+| `synapse list`                      | List registered synapse projects                                           |
+| `synapse add <path>`                | Add a file or directory to source storage, defaulting to the project scope |
+| `synapse add <path> --shared`       | Add a file or directory to the shared source root                          |
+| `synapse add <path> --scope <x>`    | Add a file or directory to a specific scope                                |
+| `synapse remove <path>`             | Remove a file or directory from source storage                             |
+| `synapse remove <path> --shared`    | Remove a file or directory from the shared source root                     |
+| `synapse remove <path> --scope <x>` | Remove a file or directory from a specific scope                           |
+| `synapse sync`                      | Preview and sync tracked files from source to the current project          |
+| `synapse sync <file>`               | Preview and sync one file                                                  |
+| `synapse sync --dry-run`            | Show sync plan without applying changes                                    |
+| `synapse sync --yes`                | Apply sync without confirmation prompt                                     |
+| `synapse sync --strategy <mode>`    | Set conflict strategy (`ask`, `theirs`, `ours`, `skip`)                    |
+| `synapse status`                    | Show sync status of tracked files                                          |
+| `synapse diff <file>`               | Show diff between source and project version                               |
 
 ## Status Symbols
 
