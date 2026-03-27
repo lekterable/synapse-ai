@@ -1,3 +1,16 @@
+# 1.2.0
+
+## Features
+
+- show last sync dates in project list 04081447
+
+## Misc
+
+- add release script 29d6eb7f
+
+# 1.1.0
+
+
 # 1.1.0
 
 ## Features
