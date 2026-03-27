@@ -78,6 +78,8 @@ const runCli = (
     env: {
       ...process.env,
       HOME: home,
+      COLUMNS: '200',
+      LINES: '40',
     },
   })
 
@@ -779,6 +781,60 @@ describe('synapse', () => {
         reason: 'Invalid --strategy value: broken',
         fix: 'Use one of: ask, theirs, ours, skip',
       })
+    })
+  })
+
+  describe('list', () => {
+    it('should show last sync dates for active projects', async () => {
+      const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
+
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'sync',
+          '--root',
+          'apps/web-consumer',
+          '--yes',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, ['list'])
+      const stdout = stripAnsi(result.stdout)
+
+      expect(result.status).toBe(0)
+      expect(stdout).toContain('Last Sync')
+      expect(stdout).toContain(new Date().toISOString().slice(0, 10))
+      expect(stdout).toContain('never')
+      expect(stdout).toContain(sandbox.webConsumer)
+      expect(
+        await readFile(join(sandbox.webConsumer, scopedFile), 'utf-8'),
+      ).toBe('web-rule-v1\n')
+      expect(
+        await readFile(join(sandbox.webConsumer, sharedFile), 'utf-8'),
+      ).toBe('shared-agents-v1\n')
+    })
+
+    it('should show a dash for last sync when the registered project path is missing', async () => {
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      await rm(sandbox.web, { recursive: true, force: true })
+
+      const result = runCli(sandbox.repo, sandbox.home, ['list'])
+      const stdout = stripAnsi(result.stdout)
+
+      expect(result.status).toBe(0)
+      expect(stdout).toContain('missing path')
+      expect(stdout).toMatch(
+        new RegExp(
+          `${sandbox.web.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s+-\\s+-\\s+missing path`,
+        ),
+      )
     })
   })
 

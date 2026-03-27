@@ -17,6 +17,12 @@ const MIN_COLUMN_WIDTH = 20
 
 type ProjectStatus = 'active' | 'missing-config' | 'missing-path'
 
+type ProjectListEntry = {
+  status: ProjectStatus
+  scope?: string
+  lastSync?: string
+}
+
 const ensureDirectory = async (
   directoryPath: string,
 ): Promise<boolean | undefined> => {
@@ -239,7 +245,7 @@ const unlinkHandler: CommandHandler = async (input, flags) => {
 
 const getProjectStatus = async (
   projectRoot: string,
-): Promise<{ status: ProjectStatus; scope?: string }> => {
+): Promise<ProjectListEntry> => {
   const exists = await pathExists(projectRoot)
   if (!exists) {
     return { status: 'missing-path' }
@@ -250,10 +256,25 @@ const getProjectStatus = async (
     return { status: 'missing-config' }
   }
 
+  const metadata = projectConfig.getProjectMetadata()
+  const lastSync = Object.values(metadata.syncedFiles).sort().at(-1)
+
   return {
     status: 'active',
-    scope: projectConfig.getProjectMetadata().scope,
+    scope: metadata.scope,
+    lastSync,
   }
+}
+
+const formatLastSync = (
+  status: ProjectStatus,
+  lastSync: string | undefined,
+): string => {
+  if (lastSync === undefined) {
+    return status === 'active' ? 'never' : '-'
+  }
+
+  return lastSync.slice(0, 10)
 }
 
 const formatStatus = (status: ProjectStatus): string => {
@@ -299,13 +320,15 @@ const listHandler: CommandHandler = async (input) => {
   )
   const padding = maxPathLength + 2
   const scopePadding = 16
-  const separatorLength = padding + scopePadding + 12
+  const lastSyncPadding = 14
+  const separatorLength = padding + scopePadding + lastSyncPadding + 12
 
   render(
     <Box flexDirection="column">
       <Text>
         {chalk.bold('Path'.padEnd(padding))}
         {chalk.bold('Scope'.padEnd(scopePadding))}
+        {chalk.bold('Last Sync'.padEnd(lastSyncPadding))}
         Status
       </Text>
       <Text>{'-'.repeat(separatorLength)}</Text>
@@ -313,6 +336,9 @@ const listHandler: CommandHandler = async (input) => {
         <Text key={project.path}>
           {project.path.padEnd(padding)}
           {(project.scope || '-').padEnd(scopePadding)}
+          {formatLastSync(project.status, project.lastSync).padEnd(
+            lastSyncPadding,
+          )}
           {formatStatus(project.status)}
         </Text>
       ))}
