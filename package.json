@@ -39,6 +39,7 @@
     "format:check": "prettier \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" README.md vitest.config.ts tsconfig.json tsup.config.ts package.json --check",
     "pack:check": "npm pack --dry-run",
     "prepublishOnly": "pnpm -s validate",
+    "release": "perfekt release new",
     "test": "pnpm -s build && vitest run",
     "types": "tsc --noEmit",
     "validate": "pnpm -s types && pnpm -s test && pnpm -s format:check"
@@ -59,6 +60,7 @@
     "@types/node": "25.3.5",
     "@types/react": "19.2.14",
     "esbuild": "0.27.3",
+    "perfekt": "3.0.1",
     "prettier": "3.8.1",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
