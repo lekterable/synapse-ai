@@ -2,6 +2,7 @@ import { stat } from 'fs/promises'
 import { pathExists } from 'fs-extra'
 import { render, Text, Box } from 'ink'
 import chalk from 'chalk'
+import { homedir } from 'os'
 import { resolve } from 'path'
 import { createConfigManager } from '../config'
 import {
@@ -67,6 +68,18 @@ const formatProjectLabel = (
   scope: string | undefined,
 ): string => {
   return scope ? `${projectRoot} (scope: ${scope})` : projectRoot
+}
+
+const formatProjectPathForDisplay = (projectRoot: string): string => {
+  const userHome = process.env.HOME || homedir()
+  const normalizeComparablePath = (pathValue: string): string =>
+    pathValue.replace(/^\/private(?=\/var\/)/, '')
+  const normalizedProjectRoot = normalizeComparablePath(projectRoot)
+  const normalizedUserHome = normalizeComparablePath(userHome)
+
+  return normalizedProjectRoot.startsWith(normalizedUserHome)
+    ? `~${normalizedProjectRoot.slice(normalizedUserHome.length)}`
+    : projectRoot
 }
 
 const parseScopeFlag = (scopeFlag: string | undefined): string | undefined => {
@@ -310,12 +323,13 @@ const listHandler: CommandHandler = async (input) => {
   const projectStatuses = await Promise.all(
     projects.map(async (projectRoot) => ({
       path: projectRoot,
+      displayPath: formatProjectPathForDisplay(projectRoot),
       ...(await getProjectStatus(projectRoot)),
     })),
   )
 
   const maxPathLength = Math.max(
-    ...projectStatuses.map((project) => project.path.length),
+    ...projectStatuses.map((project) => project.displayPath.length),
     MIN_COLUMN_WIDTH,
   )
   const padding = maxPathLength + 2
@@ -334,7 +348,7 @@ const listHandler: CommandHandler = async (input) => {
       <Text>{'-'.repeat(separatorLength)}</Text>
       {projectStatuses.map((project) => (
         <Text key={project.path}>
-          {project.path.padEnd(padding)}
+          {project.displayPath.padEnd(padding)}
           {(project.scope || '-').padEnd(scopePadding)}
           {formatLastSync(project.status, project.lastSync).padEnd(
             lastSyncPadding,

@@ -785,6 +785,20 @@ describe('synapse', () => {
   })
 
   describe('list', () => {
+    it('should shorten home-relative project paths with a tilde', async () => {
+      const homeProject = join(sandbox.home, 'projects', 'local-home-project')
+      await mkdir(homeProject, { recursive: true })
+
+      expect(runCli(homeProject, sandbox.home, ['init']).status).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, ['list'])
+      const stdout = stripAnsi(result.stdout)
+
+      expect(result.status).toBe(0)
+      expect(stdout).toContain('~/projects/local-home-project')
+      expect(stdout).not.toContain(homeProject)
+    })
+
     it('should show last sync dates for active projects', async () => {
       const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
 
