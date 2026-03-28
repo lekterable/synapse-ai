@@ -1,3 +1,9 @@
+# 1.3.0
+
+## Features
+
+- improve project list readability 2161073e
+
 # 1.2.0
 
 ## Features
