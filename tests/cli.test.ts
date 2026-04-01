@@ -254,9 +254,13 @@ describe('synapse', () => {
       ) as {
         version: number
         scope?: string
+        doctor?: {
+          initialized: boolean
+        }
       }
       expect(metadata.version).toBe(1)
       expect(metadata.scope).toBe('web')
+      expect(metadata.doctor?.initialized).toBe(false)
     })
 
     it('should return a structured error for invalid scope names', async () => {
@@ -470,6 +474,124 @@ describe('synapse', () => {
         reason: 'The add command requires a file or directory path argument',
         fix: 'Usage: synapse add <path>',
       })
+    })
+  })
+
+  describe('doctor', () => {
+    it('should run built-in checks before doctor setup is initialized', async () => {
+      await writeFile(
+        join(sandbox.web, '.cursorrules'),
+        'legacy cursor rules\n',
+        'utf-8',
+      )
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'doctor',
+        '--root',
+        'apps/web',
+      ])
+      const stdout = stripAnsi(result.stdout)
+      const metadata = JSON.parse(
+        await readFile(getProjectMetadataPath(sandbox.web), 'utf-8'),
+      ) as {
+        doctor?: {
+          initialized: boolean
+        }
+      }
+
+      expect(result.status).toBe(0)
+      expect(stdout).toContain('built-in checks only')
+      expect(stdout).toContain('Doctor Findings')
+      expect(stdout).toContain('Legacy Cursor rules file detected')
+      expect(metadata.doctor?.initialized).toBe(false)
+    })
+
+    it('should scaffold default checks on first doctor run with --yes', async () => {
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'doctor',
+        '--root',
+        'apps/web',
+        '--yes',
+      ])
+      const metadata = JSON.parse(
+        await readFile(getProjectMetadataPath(sandbox.web), 'utf-8'),
+      ) as {
+        doctor?: {
+          initialized: boolean
+        }
+      }
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain(
+        'Scaffolded default doctor checks in .synapse/checks',
+      )
+      expect(metadata.doctor?.initialized).toBe(true)
+      expect(
+        await readFile(
+          join(sandbox.web, '.synapse', 'checks', 'deprecated-cursor-rules.js'),
+          'utf-8',
+        ),
+      ).toContain('deprecated-cursor-rules')
+    })
+
+    it('should run custom doctor checks from .synapse/checks', async () => {
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      await mkdir(join(sandbox.web, '.synapse', 'checks'), { recursive: true })
+      await writeFile(
+        join(sandbox.web, '.synapse', 'checks', 'custom.js'),
+        `export default async function run() {
+  return [
+    {
+      level: 'warning',
+      code: 'custom-check',
+      file: 'AGENTS.md',
+      message: 'Custom doctor warning',
+      fix: 'Review this custom test finding',
+    },
+  ]
+}
+`,
+        'utf-8',
+      )
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'doctor',
+        '--root',
+        'apps/web',
+      ])
+      const stdout = stripAnsi(result.stdout)
+
+      expect(result.status).toBe(0)
+      expect(stdout).toContain('Custom doctor warning')
+      expect(stdout).toContain('AGENTS.md')
+      expect(stdout).not.toContain('No AI instruction files were found')
     })
   })
 
@@ -1002,6 +1124,7 @@ describe('synapse', () => {
       expect(result.stdout).toContain('--root, -r <path>')
       expect(result.stdout).toContain('--shared')
       expect(result.stdout).toContain('add <path>')
+      expect(result.stdout).toContain('doctor')
       expect(result.stdout).toContain('remove <path>')
     })
 

@@ -18,6 +18,7 @@ synapse init
 synapse add AGENTS.md
 synapse add .editorconfig
 synapse add .cursorrules
+synapse doctor --yes
 
 # Project B: initialize Synapse and sync those files in
 cd ~/project-b
@@ -33,6 +34,7 @@ This is the default model:
 - `synapse init` creates a Synapse project in the current directory
 - `synapse add <path>` stores that file or directory in the shared source layer
 - `synapse remove <path>` removes that file or directory from the selected source layer
+- `synapse doctor` runs AI-focused project checks and can scaffold editable checks on first run
 - `synapse sync` pulls shared files into another initialized project
 
 If you want to stop managing a file or directory from source storage later:
@@ -105,6 +107,8 @@ In that setup:
 | `synapse link <path>`               | Register an existing synapse project globally                              |
 | `synapse unlink`                    | Remove the current synapse project                                         |
 | `synapse list`                      | List registered synapse projects                                           |
+| `synapse doctor`                    | Run built-in AI instruction checks for the current project                 |
+| `synapse doctor --yes`              | Scaffold default editable checks in `.synapse/checks` on first run         |
 | `synapse add <path>`                | Add a file or directory to source storage, defaulting to the project scope |
 | `synapse add <path> --shared`       | Add a file or directory to the shared source root                          |
 | `synapse add <path> --scope <x>`    | Add a file or directory to a specific scope                                |
@@ -154,6 +158,12 @@ In that setup:
 - A scoped project reads from both layers: `source/scopes/<scope>/...` overrides `source/...`
 - The `scopes/` directory inside the source store is reserved for Synapse internals
 - Parent projects cannot add, diff, status, or sync files that belong to a nested Synapse project; run those commands from the nested root instead
+
+## Doctor Checks
+
+- `synapse doctor` runs built-in checks for AI instruction files like `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/*`
+- On first run, `synapse doctor --yes` scaffolds editable check files in `.synapse/checks/`
+- If `.synapse/checks/` exists, Synapse runs those custom checks instead of the built-in defaults
 
 ## Use Cases
 

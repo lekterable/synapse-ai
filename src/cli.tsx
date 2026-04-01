@@ -20,6 +20,7 @@ const cli = meow(
 	  link <path>      Link an existing synapse project in global config
 	  unlink           Remove current synapse project
 	  list             List registered synapse projects
+	  doctor           Run AI instruction checks for the current project
 	  add <path>       Add a project file or directory to source storage
 	  remove <path>    Remove a file or directory from source storage
 	  sync [file]      Sync all tracked files or one file from source
@@ -42,6 +43,7 @@ const cli = meow(
 	  $ synapse add .cursor
 	  $ synapse add AGENTS.md --shared
 	  $ synapse remove .cursor --root apps/web
+	  $ synapse doctor --yes
 	  $ synapse sync
 	  $ synapse sync --root apps/web --strategy theirs --yes
 `,

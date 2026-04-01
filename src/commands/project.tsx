@@ -6,11 +6,19 @@ import { homedir } from 'os'
 import { resolve } from 'path'
 import { createConfigManager } from '../config'
 import {
+  isDoctorInitialized,
+  markDoctorInitialized,
+  runDoctorChecks,
+  scaffoldDoctorChecks,
+  type DoctorFinding,
+} from '../doctor'
+import {
   getMissingProjectErrorDetails,
   resolveInitProjectContext,
   resolveProjectContext,
 } from '../project-context'
 import { validateScopeName } from '../source'
+import { confirm } from '../utils/confirm'
 import { showError, showSuccess, showWarning } from '../utils/output'
 import type { CommandHandler } from './types'
 
@@ -23,6 +31,12 @@ type ProjectListEntry = {
   scope?: string
   lastSync?: string
 }
+
+const DOCTOR_LEVEL_SYMBOLS = {
+  error: chalk.red('✗'),
+  warning: chalk.yellow('⚠'),
+  info: chalk.blue('ℹ'),
+} as const
 
 const ensureDirectory = async (
   directoryPath: string,
@@ -301,6 +315,82 @@ const formatStatus = (status: ProjectStatus): string => {
   }
 }
 
+const renderDoctorFindings = (findings: DoctorFinding[]): void => {
+  if (findings.length === 0) {
+    showSuccess('No doctor findings.')
+    return
+  }
+
+  console.log(chalk.bold('Doctor Findings'))
+  findings.forEach((finding) => {
+    console.log(`${DOCTOR_LEVEL_SYMBOLS[finding.level]} ${finding.message}`)
+
+    if (finding.file) {
+      console.log(`${chalk.dim('  File:')} ${finding.file}`)
+    }
+
+    if (finding.fix) {
+      console.log(`${chalk.dim('  Fix:')} ${finding.fix}`)
+    }
+  })
+
+  const errorCount = findings.filter(
+    (finding) => finding.level === 'error',
+  ).length
+  const warningCount = findings.filter(
+    (finding) => finding.level === 'warning',
+  ).length
+  const infoCount = findings.filter(
+    (finding) => finding.level === 'info',
+  ).length
+
+  console.log(
+    chalk.dim(
+      `Summary: ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info finding(s)`,
+    ),
+  )
+}
+
+const setupDoctorChecks = async (
+  projectRoot: string,
+  context: NonNullable<ReturnType<typeof resolveProjectContext>>,
+  yes: boolean,
+): Promise<void> => {
+  if (isDoctorInitialized(context.metadata)) {
+    return
+  }
+
+  if (yes) {
+    await scaffoldDoctorChecks(projectRoot)
+    markDoctorInitialized(context.configManager)
+    showSuccess('Scaffolded default doctor checks in .synapse/checks')
+    return
+  }
+
+  if (!process.stdin.isTTY) {
+    showWarning(
+      'First doctor run is using built-in checks only. Re-run with --yes to scaffold editable checks in .synapse/checks.',
+    )
+    return
+  }
+
+  const scaffoldDefaults = await confirm(
+    "It's your first time running synapse doctor. Scaffold default checks in .synapse/checks?",
+    true,
+  )
+
+  if (scaffoldDefaults) {
+    await scaffoldDoctorChecks(projectRoot)
+    showSuccess('Scaffolded default doctor checks in .synapse/checks')
+  } else {
+    showWarning(
+      'Skipping check scaffolding for now. Built-in doctor checks will still run.',
+    )
+  }
+
+  markDoctorInitialized(context.configManager)
+}
+
 const listHandler: CommandHandler = async (input) => {
   if (input.length > 0) {
     showError({
@@ -360,6 +450,31 @@ const listHandler: CommandHandler = async (input) => {
   )
 }
 
+const doctorHandler: CommandHandler = async (input, flags) => {
+  if (input.length > 0) {
+    showError({
+      problem: 'Too many arguments for doctor command',
+      reason: 'The doctor command does not accept positional arguments',
+      solution: 'Usage: synapse doctor [--root <path>] [--yes]',
+    })
+    return
+  }
+
+  const context = resolveProjectContext(flags.root)
+
+  if (!context) {
+    showError(getMissingProjectErrorDetails(flags.root))
+    return
+  }
+
+  await setupDoctorChecks(context.projectRoot, context, flags.yes)
+  const findings = await runDoctorChecks(
+    context.projectRoot,
+    context.configManager.getProjectMetadata(),
+  )
+  renderDoctorFindings(findings)
+}
+
 export const registerProjectCommands = (
   register: (name: string, handler: CommandHandler) => void,
 ): void => {
@@ -367,4 +482,5 @@ export const registerProjectCommands = (
   register('link', linkHandler)
   register('unlink', unlinkHandler)
   register('list', listHandler)
+  register('doctor', doctorHandler)
 }

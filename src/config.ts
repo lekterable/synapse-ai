@@ -18,6 +18,11 @@ const ProjectMetadataSchema = z.object({
   scope: z.string().optional(),
   syncedFiles: z.record(z.string(), z.string()),
   fileHashes: z.record(z.string(), z.string()),
+  doctor: z
+    .object({
+      initialized: z.boolean(),
+    })
+    .optional(),
 })
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>
@@ -36,6 +41,9 @@ const defaultProjectMetadata: ProjectMetadata = {
   scope: undefined,
   syncedFiles: {},
   fileHashes: {},
+  doctor: {
+    initialized: false,
+  },
 }
 
 const expandPath = (path: string): string =>
