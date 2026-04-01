@@ -1,3 +1,13 @@
+# 1.4.0
+
+## Features
+
+- add doctor command for AI instruction checks c9b43933
+
+## Misc
+
+- upgrade perfekt dependency 2c9bcbc7
+
 # 1.3.0
 
 ## Features
