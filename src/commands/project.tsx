@@ -27,6 +27,8 @@ const MIN_COLUMN_WIDTH = 20
 type ProjectStatus = 'active' | 'missing-config' | 'missing-path'
 
 type ProjectListEntry = {
+  path: string
+  displayPath: string
   status: ProjectStatus
   scope?: string
   lastSync?: string
@@ -272,22 +274,41 @@ const unlinkHandler: CommandHandler = async (input, flags) => {
 
 const getProjectStatus = async (
   projectRoot: string,
-): Promise<ProjectListEntry> => {
+): Promise<ProjectStatus> => {
   const exists = await pathExists(projectRoot)
   if (!exists) {
-    return { status: 'missing-path' }
+    return 'missing-path'
   }
 
   const projectConfig = createConfigManager(projectRoot)
   if (!projectConfig.hasProjectMetadata()) {
-    return { status: 'missing-config' }
+    return 'missing-config'
   }
 
+  return 'active'
+}
+
+const getProjectListEntry = async (
+  projectRoot: string,
+): Promise<ProjectListEntry> => {
+  const status = await getProjectStatus(projectRoot)
+
+  if (status !== 'active') {
+    return {
+      path: projectRoot,
+      displayPath: formatProjectPathForDisplay(projectRoot),
+      status,
+    }
+  }
+
+  const projectConfig = createConfigManager(projectRoot)
   const metadata = projectConfig.getProjectMetadata()
   const lastSync = Object.values(metadata.syncedFiles).sort().at(-1)
 
   return {
-    status: 'active',
+    path: projectRoot,
+    displayPath: formatProjectPathForDisplay(projectRoot),
+    status,
     scope: metadata.scope,
     lastSync,
   }
@@ -411,11 +432,7 @@ const listHandler: CommandHandler = async (input) => {
   }
 
   const projectStatuses = await Promise.all(
-    projects.map(async (projectRoot) => ({
-      path: projectRoot,
-      displayPath: formatProjectPathForDisplay(projectRoot),
-      ...(await getProjectStatus(projectRoot)),
-    })),
+    projects.map((projectRoot) => getProjectListEntry(projectRoot)),
   )
 
   const maxPathLength = Math.max(
@@ -450,6 +467,96 @@ const listHandler: CommandHandler = async (input) => {
   )
 }
 
+const renderPrunePlan = (entries: ProjectListEntry[]): void => {
+  if (entries.length === 0) {
+    return
+  }
+
+  const maxPathLength = Math.max(
+    ...entries.map((entry) => entry.displayPath.length),
+    MIN_COLUMN_WIDTH,
+  )
+  const padding = maxPathLength + 2
+  const separatorLength = padding + 16
+
+  console.log(
+    [
+      chalk.bold('Prune Plan'),
+      `${chalk.bold('Path'.padEnd(padding))}Status`,
+      '-'.repeat(separatorLength),
+      ...entries.map(
+        (entry) =>
+          `${entry.displayPath.padEnd(padding)}${formatStatus(entry.status)}`,
+      ),
+    ].join('\n'),
+  )
+}
+
+const pruneHandler: CommandHandler = async (input, flags) => {
+  if (input.length > 0) {
+    showError({
+      problem: 'Too many arguments for prune command',
+      reason: 'The prune command does not accept positional arguments',
+      solution: 'Usage: synapse prune [--dry-run] [--yes]',
+    })
+    return
+  }
+
+  const configManager = createConfigManager()
+  const globalConfig = configManager.getGlobalConfig()
+  const projectEntries = await Promise.all(
+    globalConfig.projects.map((projectRoot) =>
+      getProjectListEntry(projectRoot),
+    ),
+  )
+  const staleEntries = projectEntries.filter(
+    (project) => project.status !== 'active',
+  )
+
+  if (staleEntries.length === 0) {
+    showSuccess('No stale project registrations found.')
+    return
+  }
+
+  renderPrunePlan(staleEntries)
+
+  if (flags.dryRun) {
+    showWarning(
+      `Would remove ${staleEntries.length} stale project registration(s).`,
+    )
+    return
+  }
+
+  if (!flags.yes) {
+    if (!process.stdin.isTTY) {
+      showError({
+        problem: 'Confirmation requires interactive terminal',
+        reason: 'Prune removes stale project registrations from global config',
+        solution:
+          'Re-run with --yes to prune without prompt, or use --dry-run to preview',
+      })
+      return
+    }
+
+    const proceed = await confirm(
+      `Remove ${staleEntries.length} stale project registration(s)?`,
+      false,
+    )
+    if (!proceed) {
+      showWarning('Prune cancelled.')
+      return
+    }
+  }
+
+  const stalePaths = new Set(staleEntries.map((entry) => entry.path))
+  configManager.setGlobalConfig({
+    projects: globalConfig.projects.filter(
+      (project) => !stalePaths.has(project),
+    ),
+  })
+  showSuccess(`Removed ${staleEntries.length} stale project registration(s).`)
+}
+
 const doctorHandler: CommandHandler = async (input, flags) => {
   if (input.length > 0) {
     showError({
@@ -482,5 +589,6 @@ export const registerProjectCommands = (
   register('link', linkHandler)
   register('unlink', unlinkHandler)
   register('list', listHandler)
+  register('prune', pruneHandler)
   register('doctor', doctorHandler)
 }

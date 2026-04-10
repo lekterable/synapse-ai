@@ -20,6 +20,7 @@ const cli = meow(
 	  link <path>      Link an existing synapse project in global config
 	  unlink           Remove current synapse project
 	  list             List registered synapse projects
+	  prune            Remove stale registered projects
 	  doctor           Run AI instruction checks for the current project
 	  add <path>       Add a project file or directory to source storage
 	  remove <path>    Remove a file or directory from source storage

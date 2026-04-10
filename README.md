@@ -27,6 +27,10 @@ synapse sync --yes
 
 # Check status
 synapse status
+
+# Clean up stale project registrations later
+synapse prune --dry-run
+synapse prune --yes
 ```
 
 This is the default model:
@@ -35,6 +39,7 @@ This is the default model:
 - `synapse add <path>` stores that file or directory in the shared source layer
 - `synapse remove <path>` removes that file or directory from the selected source layer
 - `synapse doctor` runs AI-focused project checks and can scaffold editable checks on first run
+- `synapse prune` removes stale registered projects whose path or `.synapse.json` is missing
 - `synapse sync` pulls shared files into another initialized project
 
 If you want to stop managing a file or directory from source storage later:
@@ -107,6 +112,9 @@ In that setup:
 | `synapse link <path>`               | Register an existing synapse project globally                              |
 | `synapse unlink`                    | Remove the current synapse project                                         |
 | `synapse list`                      | List registered synapse projects                                           |
+| `synapse prune`                     | Remove stale registered projects from global config                        |
+| `synapse prune --dry-run`           | Preview stale project cleanup without changing config                      |
+| `synapse prune --yes`               | Apply stale project cleanup without confirmation prompt                    |
 | `synapse doctor`                    | Run built-in AI instruction checks for the current project                 |
 | `synapse doctor --yes`              | Scaffold default editable checks in `.synapse/checks` on first run         |
 | `synapse add <path>`                | Add a file or directory to source storage, defaulting to the project scope |

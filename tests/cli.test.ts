@@ -34,6 +34,9 @@ let sandbox: Sandbox
 const stripAnsi = (value: string): string =>
   value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
 
+const normalizeMacPrivatePath = (pathValue: string): string =>
+  pathValue.replace(/^\/private(?=\/var\/)/, '')
+
 const createSandbox = async (): Promise<Sandbox> => {
   const root = await mkdtemp(join(tmpdir(), 'synapse-cli-test-'))
   const home = join(root, 'home')
@@ -107,6 +110,9 @@ const expectError = (
 }
 
 const getSourceRoot = (home: string): string => join(home, '.synapse', 'source')
+
+const getGlobalConfigPath = (home: string): string =>
+  join(home, '.config', 'synapse', 'config.json')
 
 const getProjectMetadataPath = (projectRoot: string): string =>
   join(projectRoot, '.synapse.json')
@@ -974,6 +980,98 @@ describe('synapse', () => {
     })
   })
 
+  describe('prune', () => {
+    it('should preview stale project registrations without removing them', async () => {
+      expect(runCli(sandbox.repo, sandbox.home, ['init']).status).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      await rm(sandbox.web, { recursive: true, force: true })
+
+      const result = runCli(sandbox.repo, sandbox.home, ['prune', '--dry-run'])
+      const config = JSON.parse(
+        await readFile(getGlobalConfigPath(sandbox.home), 'utf-8'),
+      ) as {
+        projects: string[]
+      }
+
+      expect(result.status).toBe(0)
+      expect(stripAnsi(result.stdout)).toContain('Prune Plan')
+      expect(stripAnsi(result.stdout)).toContain('Would remove 1 stale')
+      expect(config.projects.map(normalizeMacPrivatePath)).toContain(
+        normalizeMacPrivatePath(sandbox.web),
+      )
+    })
+
+    it('should remove missing paths and missing configs from global projects', async () => {
+      expect(runCli(sandbox.repo, sandbox.home, ['init']).status).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/mobile',
+          '--scope',
+          'mobile',
+        ]).status,
+      ).toBe(0)
+      await Promise.all([
+        rm(sandbox.web, { recursive: true, force: true }),
+        rm(getProjectMetadataPath(sandbox.mobile), { force: true }),
+      ])
+
+      const result = runCli(sandbox.repo, sandbox.home, ['prune', '--yes'])
+      const config = JSON.parse(
+        await readFile(getGlobalConfigPath(sandbox.home), 'utf-8'),
+      ) as {
+        projects: string[]
+      }
+
+      expect(result.status).toBe(0)
+      expect(stripAnsi(result.stdout)).toContain(
+        'Removed 2 stale project registration(s).',
+      )
+      expect(config.projects.map(normalizeMacPrivatePath)).toEqual([
+        normalizeMacPrivatePath(sandbox.repo),
+      ])
+    })
+
+    it('should require confirmation in non-interactive mode', async () => {
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      await rm(sandbox.web, { recursive: true, force: true })
+
+      const result = runCli(sandbox.repo, sandbox.home, ['prune'])
+
+      expectError(result, {
+        problem: 'Confirmation requires interactive terminal',
+        reason: 'Prune removes stale project registrations from global config',
+        fix: 'Re-run with --yes to prune without prompt, or use --dry-run to preview',
+      })
+    })
+  })
+
   describe('nested project ownership guard', () => {
     it('should block adding a nested project file from the parent project root', async () => {
       await initializeParentAndNestedProjects(sandbox)
@@ -1125,6 +1223,7 @@ describe('synapse', () => {
       expect(result.stdout).toContain('--shared')
       expect(result.stdout).toContain('add <path>')
       expect(result.stdout).toContain('doctor')
+      expect(result.stdout).toContain('prune')
       expect(result.stdout).toContain('remove <path>')
     })
 
