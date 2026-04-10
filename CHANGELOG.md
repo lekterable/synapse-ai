@@ -1,3 +1,9 @@
+# 1.5.0
+
+## Features
+
+- add stale project pruning b64f1f32
+
 # 1.4.0
 
 ## Features
