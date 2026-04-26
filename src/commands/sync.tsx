@@ -19,6 +19,7 @@ import {
 } from '../sync-engine'
 import {
   ensureSourceDir,
+  formatScopeForDisplay,
   removeSourcePath,
   resolveEffectiveSourceFile,
   validateScopeName,
@@ -166,7 +167,11 @@ const parseSourceTargetScope = (
     return undefined
   }
 
-  return flags.scope ? validateScopeName(flags.scope) : metadataScope
+  return flags.scope
+    ? validateScopeName(flags.scope)
+    : metadataScope
+      ? validateScopeName(metadataScope)
+      : undefined
 }
 
 const formatStatus = (status: FileStatus): string => {
@@ -393,7 +398,9 @@ const addHandler: CommandHandler = async (input, flags) => {
   }
 
   if (addedCount) {
-    const targetLabel = targetScope ? `scope: ${targetScope}` : 'shared'
+    const targetLabel = targetScope
+      ? `scope: ${formatScopeForDisplay(targetScope)}`
+      : 'shared'
     showSuccess(
       `Added ${addedCount} file(s) to source (${targetLabel}): ${file}`,
     )
@@ -482,7 +489,9 @@ const removeHandler: CommandHandler = async (input, flags) => {
   )
 
   if (removedCount) {
-    const targetLabel = targetScope ? `scope: ${targetScope}` : 'shared'
+    const targetLabel = targetScope
+      ? `scope: ${formatScopeForDisplay(targetScope)}`
+      : 'shared'
     showSuccess(
       `Removed ${removedCount} file(s) from source (${targetLabel}): ${relativePath}`,
     )

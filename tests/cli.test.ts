@@ -269,6 +269,25 @@ describe('synapse', () => {
       expect(metadata.doctor?.initialized).toBe(false)
     })
 
+    it('should canonicalize composed scopes regardless of order', async () => {
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'init',
+        '--root',
+        'apps/web',
+        '--scope',
+        'React, web',
+      ])
+
+      expect(result.status).toBe(0)
+      const metadata = JSON.parse(
+        await readFile(getProjectMetadataPath(sandbox.web), 'utf-8'),
+      ) as {
+        scope?: string
+      }
+      expect(metadata.scope).toBe('react+web')
+      expect(result.stdout).toContain('scope: react, web')
+    })
+
     it('should return a structured error for invalid scope names', async () => {
       const result = runCli(sandbox.repo, sandbox.home, [
         'init',
@@ -281,8 +300,8 @@ describe('synapse', () => {
       expectError(result, {
         problem: 'Invalid scope name',
         reason:
-          'Scope names may only contain letters, numbers, dots, hyphens, and underscores',
-        fix: 'Use letters, numbers, dots, hyphens, or underscores in scope names',
+          'Scope names may only contain letters, numbers, dots, hyphens, underscores, commas, and plus signs',
+        fix: 'Use letters, numbers, dots, hyphens, underscores, commas, or plus signs in scope names',
       })
     })
   })
@@ -298,6 +317,55 @@ describe('synapse', () => {
       expect(await readFile(join(sourceRoot, sharedFile), 'utf-8')).toBe(
         'shared-agents-v1\n',
       )
+    })
+
+    it('should store composed scopes under one canonical source key', async () => {
+      await writeFile(
+        join(sandbox.web, '.cursor-rule.md'),
+        'react-web-rule\n',
+        'utf-8',
+      )
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+
+      const firstAdd = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        '.cursor-rule.md',
+        '--root',
+        'apps/web',
+        '--scope',
+        'web,react',
+      ])
+      const secondAdd = runCli(sandbox.repo, sandbox.home, [
+        'add',
+        '.cursor-rule.md',
+        '--root',
+        'apps/web',
+        '--scope',
+        'react+web',
+      ])
+
+      expect(firstAdd.status).toBe(0)
+      expect(firstAdd.stdout).toContain('scope: react, web')
+      expect(secondAdd.status).toBe(0)
+      expect(
+        await readFile(
+          join(
+            getSourceRoot(sandbox.home),
+            'scopes',
+            'react+web',
+            '.cursor-rule.md',
+          ),
+          'utf-8',
+        ),
+      ).toBe('react-web-rule\n')
     })
 
     it('should resolve add file paths relative to the selected root when --root is provided', async () => {
@@ -768,6 +836,139 @@ describe('synapse', () => {
       await expect(
         readFile(join(sandbox.mobile, '.cursorrules'), 'utf-8'),
       ).rejects.toThrow()
+    })
+
+    it('should sync every source scope contained by a composed project scope', async () => {
+      await Promise.all([
+        writeFile(join(sandbox.web, 'web.md'), 'web-only\n', 'utf-8'),
+        writeFile(join(sandbox.web, 'react.md'), 'react-only\n', 'utf-8'),
+        writeFile(join(sandbox.web, 'react-web.md'), 'react-web\n', 'utf-8'),
+      ])
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web-consumer',
+          '--scope',
+          'react,web',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'add',
+          'web.md',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'add',
+          'react.md',
+          '--root',
+          'apps/web',
+          '--scope',
+          'react',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'add',
+          'react-web.md',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web,react',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(await readFile(join(sandbox.webConsumer, 'web.md'), 'utf-8')).toBe(
+        'web-only\n',
+      )
+      expect(
+        await readFile(join(sandbox.webConsumer, 'react.md'), 'utf-8'),
+      ).toBe('react-only\n')
+      expect(
+        await readFile(join(sandbox.webConsumer, 'react-web.md'), 'utf-8'),
+      ).toBe('react-web\n')
+    })
+
+    it('should let more specific composed scopes override broader scopes', async () => {
+      await writeFile(join(sandbox.web, '.cursorrules'), 'web-rule\n', 'utf-8')
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'init',
+          '--root',
+          'apps/web-consumer',
+          '--scope',
+          'web,react',
+        ]).status,
+      ).toBe(0)
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'add',
+          '.cursorrules',
+          '--root',
+          'apps/web',
+          '--scope',
+          'web',
+        ]).status,
+      ).toBe(0)
+      await writeFile(
+        join(sandbox.web, '.cursorrules'),
+        'react-web-rule\n',
+        'utf-8',
+      )
+      expect(
+        runCli(sandbox.repo, sandbox.home, [
+          'add',
+          '.cursorrules',
+          '--root',
+          'apps/web',
+          '--scope',
+          'react+web',
+        ]).status,
+      ).toBe(0)
+
+      const result = runCli(sandbox.repo, sandbox.home, [
+        'sync',
+        '--root',
+        'apps/web-consumer',
+        '--yes',
+      ])
+
+      expect(result.status).toBe(0)
+      expect(
+        await readFile(join(sandbox.webConsumer, '.cursorrules'), 'utf-8'),
+      ).toBe('react-web-rule\n')
     })
 
     it('should use the nearest synapse root when running from a nested directory', async () => {

@@ -87,16 +87,32 @@ const removeEmptyParentDirectories = async (
   await removeEmptyParentDirectories(dirname(parentPath), normalizedStopPath)
 }
 
-const normalizeScope = (scope: string): string => {
-  const trimmedScope = scope.trim()
+const parseScopeParts = (scope: string): string[] => {
+  const scopeParts = scope
+    .split(/[,+]/)
+    .map((scopePart) => scopePart.trim().toLowerCase())
+    .filter(Boolean)
 
-  if (!/^[A-Za-z0-9._-]+$/.test(trimmedScope)) {
+  if (
+    scopeParts.length === 0 ||
+    scopeParts.some((scopePart) => !/^[a-z0-9._-]+$/.test(scopePart))
+  ) {
     throw new Error(
-      'Scope names may only contain letters, numbers, dots, hyphens, and underscores',
+      'Scope names may only contain letters, numbers, dots, hyphens, underscores, commas, and plus signs',
     )
   }
 
-  return trimmedScope
+  return [...new Set(scopeParts)].sort((a, b) => a.localeCompare(b))
+}
+
+const normalizeScope = (scope: string): string => {
+  return parseScopeParts(scope).join('+')
+}
+
+const isScopeSubset = (sourceScope: string, projectScope: string): boolean => {
+  const projectScopes = new Set(parseScopeParts(projectScope))
+
+  return parseScopeParts(sourceScope).every((scope) => projectScopes.has(scope))
 }
 
 const assertAllowedSourceRelativePath = (relativeFilePath: string): string => {
@@ -115,6 +131,10 @@ const assertAllowedSourceRelativePath = (relativeFilePath: string): string => {
 
 export const validateScopeName = (scope: string): string => {
   return normalizeScope(scope)
+}
+
+export const formatScopeForDisplay = (scope: string): string => {
+  return parseScopeParts(scope).join(', ')
 }
 
 export const resolveSharedSourcePath = (
@@ -161,22 +181,75 @@ const getScopeRootPath = (
     : sourceRoot
 }
 
+const listMatchingScopeKeys = async (
+  sourceRoot: string,
+  projectScope: string | undefined,
+): Promise<string[]> => {
+  if (!projectScope) {
+    return []
+  }
+
+  const scopesRoot = resolveWithin(sourceRoot, SCOPES_DIRECTORY)
+
+  if (!(await pathExists(scopesRoot))) {
+    return []
+  }
+
+  const entries = await readdir(scopesRoot, { withFileTypes: true })
+  return [
+    ...new Set(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => normalizeScope(entry.name)),
+    ),
+  ]
+    .filter((scope) => isScopeSubset(scope, projectScope))
+    .sort((leftScope, rightScope) => {
+      const specificity =
+        parseScopeParts(leftScope).length - parseScopeParts(rightScope).length
+
+      return specificity === 0
+        ? leftScope.localeCompare(rightScope)
+        : specificity
+    })
+}
+
 export const resolveEffectiveSourceFile = async (
   sourceRoot: string,
   relativeFilePath: string,
   scope: string | undefined,
 ): Promise<SourceFileLocation | undefined> => {
   const normalizedPath = assertAllowedSourceRelativePath(relativeFilePath)
-  const scopedPath = scope
-    ? resolveScopedSourcePath(sourceRoot, scope, normalizedPath)
-    : undefined
 
-  if (scopedPath && (await pathExists(scopedPath))) {
-    return {
-      file: normalizedPath,
-      path: scopedPath,
-      scope,
-    }
+  const matchingScopeKeys = await listMatchingScopeKeys(sourceRoot, scope)
+  const scopedSourceFile = await [...matchingScopeKeys]
+    .reverse()
+    .reduce<
+      Promise<SourceFileLocation | undefined>
+    >(async (matchedFilePromise, scopeKey) => {
+      const matchedFile = await matchedFilePromise
+
+      if (matchedFile) {
+        return matchedFile
+      }
+
+      const scopedPath = resolveScopedSourcePath(
+        sourceRoot,
+        scopeKey,
+        normalizedPath,
+      )
+
+      return (await pathExists(scopedPath))
+        ? {
+            file: normalizedPath,
+            path: scopedPath,
+            scope: scopeKey,
+          }
+        : undefined
+    }, Promise.resolve(undefined))
+
+  if (scopedSourceFile) {
+    return scopedSourceFile
   }
 
   const sharedPath = resolveSharedSourcePath(sourceRoot, normalizedPath)
@@ -201,27 +274,28 @@ export const listEffectiveSourceFiles = async (
       ] as const,
   )
 
-  const scopedFiles = scope
-    ? await listSourceFiles(
-        resolveWithin(
-          sourceRoot,
-          join(SCOPES_DIRECTORY, normalizeScope(scope)),
-        ),
-      )
-    : []
-  const scopedEntries = scope
-    ? scopedFiles.map(
-        (file) =>
-          [
-            file,
-            {
+  const matchingScopeKeys = await listMatchingScopeKeys(sourceRoot, scope)
+  const scopedEntries = (
+    await Promise.all(
+      matchingScopeKeys.map(async (scopeKey) =>
+        (
+          await listSourceFiles(
+            resolveWithin(sourceRoot, join(SCOPES_DIRECTORY, scopeKey)),
+          )
+        ).map(
+          (file) =>
+            [
               file,
-              path: resolveScopedSourcePath(sourceRoot, scope, file),
-              scope,
-            },
-          ] as const,
-      )
-    : []
+              {
+                file,
+                path: resolveScopedSourcePath(sourceRoot, scopeKey, file),
+                scope: scopeKey,
+              },
+            ] as const,
+        ),
+      ),
+    )
+  ).flat()
 
   return [...new Map([...sharedEntries, ...scopedEntries]).values()].sort(
     (a, b) => a.file.localeCompare(b.file),

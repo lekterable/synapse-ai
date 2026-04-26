@@ -17,7 +17,7 @@ import {
   resolveInitProjectContext,
   resolveProjectContext,
 } from '../project-context'
-import { validateScopeName } from '../source'
+import { formatScopeForDisplay, validateScopeName } from '../source'
 import { confirm } from '../utils/confirm'
 import { showError, showSuccess, showWarning } from '../utils/output'
 import type { CommandHandler } from './types'
@@ -83,7 +83,9 @@ const formatProjectLabel = (
   projectRoot: string,
   scope: string | undefined,
 ): string => {
-  return scope ? `${projectRoot} (scope: ${scope})` : projectRoot
+  return scope
+    ? `${projectRoot} (scope: ${formatScopeForDisplay(scope)})`
+    : projectRoot
 }
 
 const formatProjectPathForDisplay = (projectRoot: string): string => {
@@ -124,7 +126,7 @@ const initHandler: CommandHandler = async (input, flags) => {
       problem: 'Invalid scope name',
       reason: error instanceof Error ? error.message : String(error),
       solution:
-        'Use letters, numbers, dots, hyphens, or underscores in scope names',
+        'Use letters, numbers, dots, hyphens, underscores, commas, or plus signs in scope names',
     })
     return
   }
@@ -456,7 +458,9 @@ const listHandler: CommandHandler = async (input) => {
       {projectStatuses.map((project) => (
         <Text key={project.path}>
           {project.displayPath.padEnd(padding)}
-          {(project.scope || '-').padEnd(scopePadding)}
+          {(project.scope ? formatScopeForDisplay(project.scope) : '-').padEnd(
+            scopePadding,
+          )}
           {formatLastSync(project.status, project.lastSync).padEnd(
             lastSyncPadding,
           )}

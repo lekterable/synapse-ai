@@ -35,12 +35,12 @@ const cli = meow(
 	  --yes, -y               Skip confirmation prompt in sync
 	  --strategy, -s <mode>   Conflict strategy: ask | theirs | ours | skip
 	  --root, -r <path>       Operate on a specific synapse project root
-	  --scope <name>          Set or target a source scope
+	  --scope <name[,name]>   Set or target source scopes
 	  --shared                Write added files to the shared source root
 
 	Examples
 	  $ synapse init
-	  $ synapse init --root apps/web --scope web
+	  $ synapse init --root apps/web --scope web,react
 	  $ synapse add .cursor
 	  $ synapse add AGENTS.md --shared
 	  $ synapse remove .cursor --root apps/web
