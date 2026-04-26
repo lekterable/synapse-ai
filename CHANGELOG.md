@@ -1,3 +1,9 @@
+# 1.6.0
+
+## Features
+
+- support composed scope matching 3781bb9b
+
 # 1.5.0
 
 ## Features
