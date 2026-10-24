@@ -1,0 +1,13 @@
+name: Commitlint
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, edited, reopened]
+
+jobs:
+  commitlint:
+    name: Commitlint
+    permissions:
+      contents: read
+    uses: lekterable/perfekt/.github/workflows/commitlint.yml@master
