@@ -132,6 +132,38 @@ In that setup:
 | `synapse sync --strategy <mode>`     | Set conflict strategy (`ask`, `theirs`, `ours`, `skip`)                    |
 | `synapse status`                     | Show sync status of tracked files                                          |
 | `synapse diff <file>`                | Show diff between source and project version                               |
+| `synapse blocks [check]`             | Compare shared blocks inside files with their source; exits 1 on drift     |
+| `synapse blocks sync`                | Rewrite drifted blocks from source (`--dry-run` to preview)                |
+| `synapse blocks pull <file>`         | Make a file's blocks the new source                                        |
+
+## Shared Blocks
+
+Some text has to be identical across repos but lives inside a file each repo owns, like a shared "Code conventions" section in every `CLAUDE.md`. Wrap it in markers:
+
+```md
+<!-- synapse:code-conventions -->
+
+## Code conventions
+
+...
+
+<!-- /synapse:code-conventions -->
+```
+
+The canonical text lives in `<sourcePath>/blocks/code-conventions.md`. `synapse blocks` looks in `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` and `GEMINI.md` of every repo, and only touches files that carry the markers, so a repo opts in by adding them. Blocks need no `synapse init`.
+
+```bash
+# Edited the block in one repo? Make it the source
+synapse blocks pull CLAUDE.md
+
+# Which repos drifted (exit code 1 when any did, for scheduled checks)
+synapse blocks check --repos ~/.config/projects.yaml
+
+# Bring them in line
+synapse blocks sync --repos ~/.config/projects.yaml
+```
+
+`--repos` takes a YAML list with a `root` folder and `repos` keyed by folder name under it. Without it, blocks covers the registered synapse projects.
 
 ## Status Symbols
 

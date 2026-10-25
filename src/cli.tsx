@@ -3,12 +3,14 @@
 import meow from 'meow'
 import { getCommandHandler, registerCommand } from './commands'
 import type { CliFlags } from './commands/types'
+import { registerBlocksCommands } from './commands/blocks'
 import { registerProjectCommands } from './commands/project'
 import { registerSyncCommands } from './commands/sync'
 import { showVersion, showError } from './utils/output'
 
 registerProjectCommands(registerCommand)
 registerSyncCommands(registerCommand)
+registerBlocksCommands(registerCommand)
 
 const cli = meow(
   `
@@ -27,6 +29,7 @@ const cli = meow(
 	  sync [file]      Sync all tracked files or one file from source
 	  status           Show sync status of tracked files
 	  diff <file>      Show diff between source and project version
+	  blocks [action]  Shared blocks inside files: check (default), sync, pull <file>
 
 	Options
 	  --help, -h              Show help
@@ -37,6 +40,7 @@ const cli = meow(
 	  --root, -r <path>       Operate on a specific synapse project root
 	  --scope <name[,name]>   Set or target source scopes
 	  --shared                Write added files to the shared source root
+	  --repos <file>          blocks: repos from a projects.yaml-style list
 
 	Examples
 	  $ synapse init
@@ -47,6 +51,7 @@ const cli = meow(
 	  $ synapse doctor --yes
 	  $ synapse sync
 	  $ synapse sync --root apps/web --strategy theirs --yes
+	  $ synapse blocks check --repos ~/.config/projects.yaml
 `,
   {
     importMeta: import.meta,
@@ -82,6 +87,9 @@ const cli = meow(
       shared: {
         type: 'boolean',
       },
+      repos: {
+        type: 'string',
+      },
     },
   },
 )
@@ -96,6 +104,7 @@ const parseCliFlags = (flags: Record<string, unknown>): CliFlags => {
     root: typeof flags.root === 'string' ? flags.root : undefined,
     scope: typeof flags.scope === 'string' ? flags.scope : undefined,
     shared: flags.shared === true,
+    repos: typeof flags.repos === 'string' ? flags.repos : undefined,
   }
 }
 
