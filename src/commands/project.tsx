@@ -185,7 +185,9 @@ const initHandler: CommandHandler = async (input, flags) => {
 }
 
 const linkHandler: CommandHandler = async (input) => {
-  if (input.length === 0) {
+  const [projectPath] = input
+
+  if (projectPath === undefined) {
     showError({
       problem: 'No path specified for link command',
       reason: 'The link command requires a directory path argument',
@@ -203,7 +205,7 @@ const linkHandler: CommandHandler = async (input) => {
     return
   }
 
-  const pathToLink = resolve(input[0])
+  const pathToLink = resolve(projectPath)
   const isDirectory = await ensureDirectory(pathToLink)
 
   if (isDirectory === undefined) {

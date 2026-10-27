@@ -1,5 +1,5 @@
-import { copyFile, mkdir, stat, readFile, readdir, rm } from 'fs/promises'
-import { move, pathExists } from 'fs-extra'
+import { copyFile, mkdir, readFile, readdir, rm } from 'fs/promises'
+import { move } from 'fs-extra'
 import { join, dirname, basename, relative, resolve } from 'path'
 import { createHash } from 'crypto'
 import { minimatch } from 'minimatch'

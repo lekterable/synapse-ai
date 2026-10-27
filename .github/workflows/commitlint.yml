@@ -6,8 +6,8 @@ on:
     types: [opened, edited, reopened, synchronize]
 
 jobs:
-  commitlint:
-    name: Commitlint
+  conventional-commits:
+    name: Conventional Commits
     permissions:
       contents: read
     uses: lekterable/perfekt/.github/workflows/commitlint.yml@master
