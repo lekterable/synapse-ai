@@ -45,7 +45,14 @@ export const diffFiles = async (
 
   const changes = diffLines(sourceContent, projectContent)
 
-  if (changes.length === 1 && !changes[0].added && !changes[0].removed) {
+  const [firstChange] = changes
+
+  if (
+    changes.length === 1 &&
+    firstChange !== undefined &&
+    !firstChange.added &&
+    !firstChange.removed
+  ) {
     return undefined
   }
 

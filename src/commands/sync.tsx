@@ -345,7 +345,9 @@ const syncHandler: CommandHandler = async (input, flags) => {
 }
 
 const addHandler: CommandHandler = async (input, flags) => {
-  if (input.length === 0) {
+  const [file] = input
+
+  if (file === undefined) {
     showError({
       problem: 'No path specified for add command',
       reason: 'The add command requires a file or directory path argument',
@@ -365,7 +367,6 @@ const addHandler: CommandHandler = async (input, flags) => {
 
   const context = resolveRequiredProjectContext(flags.root)
   const { projectRoot, configManager, metadata } = context
-  const file = input[0]
 
   let targetScope: string | undefined
   try {
@@ -416,7 +417,9 @@ const addHandler: CommandHandler = async (input, flags) => {
 }
 
 const removeHandler: CommandHandler = async (input, flags) => {
-  if (input.length === 0) {
+  const [file] = input
+
+  if (file === undefined) {
     showError({
       problem: 'No path specified for remove command',
       reason: 'The remove command requires a file or directory path argument',
@@ -436,7 +439,6 @@ const removeHandler: CommandHandler = async (input, flags) => {
 
   const context = resolveRequiredProjectContext(flags.root)
   const { projectRoot, configManager, metadata } = context
-  const file = input[0]
 
   let targetScope: string | undefined
   try {
@@ -563,7 +565,9 @@ const statusHandler: CommandHandler = async (input, flags) => {
 }
 
 const diffHandler: CommandHandler = async (input, flags) => {
-  if (input.length === 0) {
+  const [file] = input
+
+  if (file === undefined) {
     showError({
       problem: 'No file specified for diff command',
       reason: 'The diff command requires a file path argument',
@@ -583,7 +587,6 @@ const diffHandler: CommandHandler = async (input, flags) => {
 
   const context = resolveRequiredProjectContext(flags.root)
   const { projectRoot, configManager, metadata } = context
-  const file = input[0]
   const sourceRoot = await ensureSourceDir(configManager)
 
   let relativePath: string

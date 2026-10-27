@@ -3,11 +3,11 @@ name: Commitlint
 on:
   pull_request:
     branches: [master]
-    types: [opened, edited, reopened]
+    types: [opened, edited, reopened, synchronize]
 
 jobs:
-  commitlint:
-    name: Commitlint
+  conventional-commits:
+    name: Conventional Commits
     permissions:
       contents: read
     uses: lekterable/perfekt/.github/workflows/commitlint.yml@master
