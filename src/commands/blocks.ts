@@ -15,6 +15,7 @@ import {
   replaceBlocks,
 } from '../blocks'
 import { createConfigManager } from '../config'
+import { print } from '../utils/output'
 import type { CliFlags, CommandHandler } from './types'
 
 const readSources = (dir: string): Record<string, string> =>
@@ -43,16 +44,12 @@ const check = (flags: CliFlags): void => {
   const drifted = states.filter((state) => state.state === 'drifted')
   const unknown = states.filter((state) => state.state === 'no-source')
   drifted.forEach((state) =>
-    console.log(
-      `${chalk.yellow('drifted')}  ${state.name}  ${display(state.file)}`,
-    ),
+    print(`${chalk.yellow('drifted')}  ${state.name}  ${display(state.file)}`),
   )
   unknown.forEach((state) =>
-    console.log(
-      `${chalk.dim('no source')}  ${state.name}  ${display(state.file)}`,
-    ),
+    print(`${chalk.dim('no source')}  ${state.name}  ${display(state.file)}`),
   )
-  console.log(
+  print(
     `${states.length - drifted.length - unknown.length} in sync, ${drifted.length} drifted, ${unknown.length} without a source`,
   )
   // A non-zero exit lets a scheduled job report drift.
@@ -71,11 +68,9 @@ const sync = (flags: CliFlags): void => {
   files.forEach((file) => {
     if (!flags.dryRun)
       writeFileSync(file, replaceBlocks(readFileSync(file, 'utf8'), sources))
-    console.log(
-      `${flags.dryRun ? 'would update' : 'updated'}  ${display(file)}`,
-    )
+    print(`${flags.dryRun ? 'would update' : 'updated'}  ${display(file)}`)
   })
-  if (files.length === 0) console.log('Every block is in sync')
+  if (files.length === 0) print('Every block is in sync')
 }
 
 // Makes a file's blocks the new source, e.g. after editing them in one repo.
@@ -87,7 +82,7 @@ const pull = (file: string | undefined, flags: CliFlags): void => {
   if (!flags.dryRun) mkdirSync(dir, { recursive: true })
   blocks.forEach(({ name, content }) => {
     if (!flags.dryRun) writeFileSync(join(dir, `${name}.md`), `${content}\n`)
-    console.log(
+    print(
       `${flags.dryRun ? 'would save' : 'saved'}  ${name} → ${join(dir, `${name}.md`)}`,
     )
   })

@@ -2,7 +2,7 @@ import { readdir, rm, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { dirname, join, relative, resolve } from 'path'
 import { mkdirp, pathExists } from 'fs-extra'
-import { type ConfigManager } from './config'
+import type { ConfigManager } from './config'
 import { normalizeRelativePath, resolveWithin } from './utils/paths'
 
 export const SCOPES_DIRECTORY = 'scopes'

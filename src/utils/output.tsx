@@ -1,6 +1,6 @@
 import chalk from 'chalk'
 
-export interface ErrorDetails {
+export type ErrorDetails = {
   problem: string
   reason: string
   solution: string
@@ -17,14 +17,19 @@ export const showError = (details: ErrorDetails): never => {
   process.exit(exitCode)
 }
 
+// Writes one line to stdout, like console.log with a single string.
+export const print = (message: string): void => {
+  process.stdout.write(`${message}\n`)
+}
+
 export const showWarning = (message: string): void => {
-  console.log(chalk.yellow(message))
+  print(chalk.yellow(message))
 }
 
 export const showSuccess = (message: string): void => {
-  console.log(chalk.green(message))
+  print(chalk.green(message))
 }
 
 export const showVersion = (version: string): void => {
-  console.log(version)
+  print(version)
 }

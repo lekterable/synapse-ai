@@ -2,6 +2,7 @@ import { spawnSync } from 'child_process'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
+import { stripVTControlCharacters } from 'util'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 type CliResult = {
@@ -30,9 +31,6 @@ type SourceSetup = {
 const cliPath = join(process.cwd(), 'dist', 'cli.js')
 let sandboxes: string[] = []
 let sandbox: Sandbox
-
-const stripAnsi = (value: string): string =>
-  value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
 
 const normalizeMacPrivatePath = (pathValue: string): string =>
   pathValue.replace(/^\/private(?=\/var\/)/, '')
@@ -101,7 +99,7 @@ const expectError = (
     fix: string
   },
 ): void => {
-  const stderr = stripAnsi(result.stderr)
+  const stderr = stripVTControlCharacters(result.stderr)
 
   expect(result.status).toBe(1)
   expect(stderr).toContain(`Error: ${expected.problem}`)
@@ -573,7 +571,7 @@ describe('synapse', () => {
         '--root',
         'apps/web',
       ])
-      const stdout = stripAnsi(result.stdout)
+      const stdout = stripVTControlCharacters(result.stdout)
       const metadata = JSON.parse(
         await readFile(getProjectMetadataPath(sandbox.web), 'utf-8'),
       ) as {
@@ -660,7 +658,7 @@ describe('synapse', () => {
         '--root',
         'apps/web',
       ])
-      const stdout = stripAnsi(result.stdout)
+      const stdout = stripVTControlCharacters(result.stdout)
 
       expect(result.status).toBe(0)
       expect(stdout).toContain('Custom doctor warning')
@@ -1121,7 +1119,7 @@ describe('synapse', () => {
       expect(runCli(homeProject, sandbox.home, ['init']).status).toBe(0)
 
       const result = runCli(sandbox.repo, sandbox.home, ['list'])
-      const stdout = stripAnsi(result.stdout)
+      const stdout = stripVTControlCharacters(result.stdout)
 
       expect(result.status).toBe(0)
       expect(stdout).toContain('~/projects/local-home-project')
@@ -1141,7 +1139,7 @@ describe('synapse', () => {
       ).toBe(0)
 
       const result = runCli(sandbox.repo, sandbox.home, ['list'])
-      const stdout = stripAnsi(result.stdout)
+      const stdout = stripVTControlCharacters(result.stdout)
 
       expect(result.status).toBe(0)
       expect(stdout).toContain('Last Sync')
@@ -1169,7 +1167,7 @@ describe('synapse', () => {
       await rm(sandbox.web, { recursive: true, force: true })
 
       const result = runCli(sandbox.repo, sandbox.home, ['list'])
-      const stdout = stripAnsi(result.stdout)
+      const stdout = stripVTControlCharacters(result.stdout)
 
       expect(result.status).toBe(0)
       expect(stdout).toContain('missing path')
@@ -1203,8 +1201,10 @@ describe('synapse', () => {
       }
 
       expect(result.status).toBe(0)
-      expect(stripAnsi(result.stdout)).toContain('Prune Plan')
-      expect(stripAnsi(result.stdout)).toContain('Would remove 1 stale')
+      expect(stripVTControlCharacters(result.stdout)).toContain('Prune Plan')
+      expect(stripVTControlCharacters(result.stdout)).toContain(
+        'Would remove 1 stale',
+      )
       expect(config.projects.map(normalizeMacPrivatePath)).toContain(
         normalizeMacPrivatePath(sandbox.web),
       )
@@ -1243,7 +1243,7 @@ describe('synapse', () => {
       }
 
       expect(result.status).toBe(0)
-      expect(stripAnsi(result.stdout)).toContain(
+      expect(stripVTControlCharacters(result.stdout)).toContain(
         'Removed 2 stale project registration(s).',
       )
       expect(config.projects.map(normalizeMacPrivatePath)).toEqual([

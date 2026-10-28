@@ -19,7 +19,7 @@ import {
 } from '../project-context'
 import { formatScopeForDisplay, validateScopeName } from '../source'
 import { confirm } from '../utils/confirm'
-import { showError, showSuccess, showWarning } from '../utils/output'
+import { print, showError, showSuccess, showWarning } from '../utils/output'
 import type { CommandHandler } from './types'
 
 const MIN_COLUMN_WIDTH = 20
@@ -346,16 +346,16 @@ const renderDoctorFindings = (findings: DoctorFinding[]): void => {
     return
   }
 
-  console.log(chalk.bold('Doctor Findings'))
+  print(chalk.bold('Doctor Findings'))
   findings.forEach((finding) => {
-    console.log(`${DOCTOR_LEVEL_SYMBOLS[finding.level]} ${finding.message}`)
+    print(`${DOCTOR_LEVEL_SYMBOLS[finding.level]} ${finding.message}`)
 
     if (finding.file) {
-      console.log(`${chalk.dim('  File:')} ${finding.file}`)
+      print(`${chalk.dim('  File:')} ${finding.file}`)
     }
 
     if (finding.fix) {
-      console.log(`${chalk.dim('  Fix:')} ${finding.fix}`)
+      print(`${chalk.dim('  Fix:')} ${finding.fix}`)
     }
   })
 
@@ -369,7 +369,7 @@ const renderDoctorFindings = (findings: DoctorFinding[]): void => {
     (finding) => finding.level === 'info',
   ).length
 
-  console.log(
+  print(
     chalk.dim(
       `Summary: ${errorCount} error(s), ${warningCount} warning(s), ${infoCount} info finding(s)`,
     ),
@@ -485,7 +485,7 @@ const renderPrunePlan = (entries: ProjectListEntry[]): void => {
   const padding = maxPathLength + 2
   const separatorLength = padding + 16
 
-  console.log(
+  print(
     [
       chalk.bold('Prune Plan'),
       `${chalk.bold('Path'.padEnd(padding))}Status`,

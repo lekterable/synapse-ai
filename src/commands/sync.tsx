@@ -26,7 +26,7 @@ import {
 } from '../sync-engine'
 import { confirm } from '../utils/confirm'
 import { diffFiles } from '../utils/diff'
-import { showError, showSuccess, showWarning } from '../utils/output'
+import { print, showError, showSuccess, showWarning } from '../utils/output'
 import { toProjectRelativePath } from '../utils/paths'
 import {
   ensureProjectOwnsPath,
@@ -71,7 +71,7 @@ const renderPlan = (plan: SyncPlanItem[]): void => {
   const maxFileLength = Math.max(...plan.map((item) => item.file.length), 20)
   const padding = maxFileLength + 2
 
-  console.log(
+  print(
     [
       chalk.bold('Sync Plan'),
       `${chalk.bold('File'.padEnd(padding))}State`,
@@ -149,10 +149,10 @@ const resolveRequiredProjectContext = (
   const context = resolveProjectContext(rootFlag)
 
   if (!context) {
-    showError(getMissingProjectErrorDetails(rootFlag))
+    return showError(getMissingProjectErrorDetails(rootFlag))
   }
 
-  return context!
+  return context
 }
 
 const parseSourceTargetScope = (
