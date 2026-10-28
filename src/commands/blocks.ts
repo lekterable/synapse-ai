@@ -1,12 +1,12 @@
-import chalk from 'chalk'
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   writeFileSync,
 } from 'fs'
 import { join, relative, resolve } from 'path'
+import chalk from 'chalk'
 import {
   blockStates,
   blocksDir,

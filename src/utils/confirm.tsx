@@ -1,6 +1,6 @@
-import React, { useRef } from 'react'
-import { Box, Text, render, useInput } from 'ink'
 import chalk from 'chalk'
+import { Box, render, Text, useInput } from 'ink'
+import React, { useRef } from 'react'
 
 type ConfirmPromptProps = {
   message: string

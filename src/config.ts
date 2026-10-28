@@ -1,8 +1,8 @@
-import Conf from 'conf'
-import { z } from 'zod'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'fs'
+import Conf from 'conf'
+import { z } from 'zod'
 import { PROJECT_METADATA_FILENAME } from './utils/project-root'
 
 const GlobalConfigSchema = z.object({

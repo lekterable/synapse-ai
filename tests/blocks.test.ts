@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process'
-import { mkdtemp, mkdir, readFile, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'

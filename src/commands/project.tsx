@@ -1,16 +1,16 @@
 import { stat } from 'fs/promises'
-import { pathExists } from 'fs-extra'
-import { render, Text, Box } from 'ink'
-import chalk from 'chalk'
 import { homedir } from 'os'
 import { resolve } from 'path'
+import chalk from 'chalk'
+import { pathExists } from 'fs-extra'
+import { Box, render, Text } from 'ink'
 import { createConfigManager } from '../config'
 import {
+  type DoctorFinding,
   isDoctorInitialized,
   markDoctorInitialized,
   runDoctorChecks,
   scaffoldDoctorChecks,
-  type DoctorFinding,
 } from '../doctor'
 import {
   getMissingProjectErrorDetails,
