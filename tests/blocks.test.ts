@@ -1,8 +1,8 @@
 import { spawnSync } from 'child_process'
-import { mkdir, mkdtemp, readFile, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { findBlocks, replaceBlocks } from '../src/blocks'
 
 const cliPath = join(process.cwd(), 'dist', 'cli.js')
@@ -24,6 +24,7 @@ describe('blocks', () => {
 
   it('should report drift from a projects.yaml list, sync it, and exit 0 once in sync', async () => {
     const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
+    onTestFinished(() => rm(root, { recursive: true, force: true }))
     const home = join(root, 'home')
     await mkdir(join(home, '.synapse', 'source', 'blocks'), { recursive: true })
     await writeFile(
