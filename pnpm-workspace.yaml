@@ -1,2 +1,4 @@
+allowBuilds:
+  esbuild: true
 minimumReleaseAgeExclude:
   - perfekt@4.1.0
