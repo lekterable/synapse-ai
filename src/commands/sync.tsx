@@ -1,4 +1,4 @@
-import { homedir } from 'os'
+import { homedir } from 'node:os'
 import chalk from 'chalk'
 import { Box, render, Text } from 'ink'
 import {

@@ -1,7 +1,7 @@
-import { spawnSync } from 'child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
-import { tmpdir } from 'os'
-import { join } from 'path'
+import { spawnSync } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { findBlocks, replaceBlocks } from '../src/blocks'
 

@@ -1,6 +1,6 @@
-import { readdir, readFile, stat, writeFile } from 'fs/promises'
-import { join, relative } from 'path'
-import { pathToFileURL } from 'url'
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { join, relative } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { mkdirp, pathExists } from 'fs-extra'
 import type { ConfigManager, ProjectMetadata } from './config'
 

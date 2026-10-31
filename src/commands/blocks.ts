@@ -4,8 +4,8 @@ import {
   readdirSync,
   readFileSync,
   writeFileSync,
-} from 'fs'
-import { join, relative, resolve } from 'path'
+} from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import chalk from 'chalk'
 import {
   blockStates,

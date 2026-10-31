@@ -1,6 +1,6 @@
-import { createHash } from 'crypto'
-import { copyFile, mkdir, readdir, readFile, rm } from 'fs/promises'
-import { basename, dirname, join, relative, resolve } from 'path'
+import { createHash } from 'node:crypto'
+import { copyFile, mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { move } from 'fs-extra'
 import { minimatch } from 'minimatch'
 import type { ConfigManager } from './config'
@@ -66,7 +66,7 @@ export const copyFileAtomic = async (
     await copyFile(src, tmpPath)
     await move(tmpPath, dest, { overwrite: true })
   } catch (error) {
-    await rm(tmpPath, { force: true }).catch(() => {})
+    await rm(tmpPath, { force: true }).catch(() => undefined)
     throw error
   }
 }

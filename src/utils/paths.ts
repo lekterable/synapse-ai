@@ -1,4 +1,4 @@
-import { isAbsolute, normalize, relative, resolve } from 'path'
+import { isAbsolute, normalize, relative, resolve } from 'node:path'
 
 const toPortablePath = (inputPath: string): string =>
   inputPath.split('\\').join('/')

@@ -1,8 +1,15 @@
-import { spawnSync } from 'child_process'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises'
-import { tmpdir } from 'os'
-import { dirname, join } from 'path'
-import { stripVTControlCharacters } from 'util'
+import { spawnSync } from 'node:child_process'
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { stripVTControlCharacters } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 type CliResult = {
