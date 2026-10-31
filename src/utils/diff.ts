@@ -1,4 +1,4 @@
-import { open, readFile } from 'fs/promises'
+import { open, readFile } from 'node:fs/promises'
 import chalk from 'chalk'
 import { diffLines } from 'diff'
 import { pathExists } from 'fs-extra'
@@ -13,7 +13,7 @@ const isTextFile = async (filePath: string): Promise<boolean> => {
   } catch {
     return false
   } finally {
-    await handle?.close().catch(() => {})
+    await handle?.close().catch(() => undefined)
   }
 }
 
@@ -59,10 +59,10 @@ export const diffFiles = async (
   return changes
     .map((change) =>
       change.added
-        ? chalk.green('+' + change.value)
+        ? chalk.green(`+${change.value}`)
         : change.removed
-          ? chalk.red('-' + change.value)
-          : ' ' + change.value,
+          ? chalk.red(`-${change.value}`)
+          : ` ${change.value}`,
     )
     .join('')
 }

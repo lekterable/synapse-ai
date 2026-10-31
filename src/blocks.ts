@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'fs'
-import { homedir } from 'os'
-import { join } from 'path'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { parse } from 'yaml'
 
 // A block is a marked region inside a file that otherwise belongs to the repo, like the
