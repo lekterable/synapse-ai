@@ -1,5 +1,5 @@
-import { stat } from 'fs/promises'
-import { isAbsolute, resolve } from 'path'
+import { stat } from 'node:fs/promises'
+import { isAbsolute, resolve } from 'node:path'
 import { pathExists } from 'fs-extra'
 import type { ConfigManager } from './config'
 import {

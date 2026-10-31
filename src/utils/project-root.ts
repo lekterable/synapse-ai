@@ -1,5 +1,5 @@
-import { existsSync } from 'fs'
-import { dirname, join, relative, resolve } from 'path'
+import { existsSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { normalizeRelativePath, resolveWithin } from './paths'
 
 export const PROJECT_METADATA_FILENAME = '.synapse.json'
