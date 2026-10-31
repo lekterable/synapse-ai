@@ -1,8 +1,8 @@
 import { readdir, rm, stat } from 'fs/promises'
-import { mkdirp, pathExists } from 'fs-extra'
-import { dirname, join, relative, resolve } from 'path'
 import { homedir } from 'os'
-import { type ConfigManager } from './config'
+import { dirname, join, relative, resolve } from 'path'
+import { mkdirp, pathExists } from 'fs-extra'
+import type { ConfigManager } from './config'
 import { normalizeRelativePath, resolveWithin } from './utils/paths'
 
 export const SCOPES_DIRECTORY = 'scopes'
@@ -224,29 +224,30 @@ export const resolveEffectiveSourceFile = async (
   const matchingScopeKeys = await listMatchingScopeKeys(sourceRoot, scope)
   const scopedSourceFile = await [...matchingScopeKeys]
     .reverse()
-    .reduce<
-      Promise<SourceFileLocation | undefined>
-    >(async (matchedFilePromise, scopeKey) => {
-      const matchedFile = await matchedFilePromise
+    .reduce<Promise<SourceFileLocation | undefined>>(
+      async (matchedFilePromise, scopeKey) => {
+        const matchedFile = await matchedFilePromise
 
-      if (matchedFile) {
-        return matchedFile
-      }
+        if (matchedFile) {
+          return matchedFile
+        }
 
-      const scopedPath = resolveScopedSourcePath(
-        sourceRoot,
-        scopeKey,
-        normalizedPath,
-      )
+        const scopedPath = resolveScopedSourcePath(
+          sourceRoot,
+          scopeKey,
+          normalizedPath,
+        )
 
-      return (await pathExists(scopedPath))
-        ? {
-            file: normalizedPath,
-            path: scopedPath,
-            scope: scopeKey,
-          }
-        : undefined
-    }, Promise.resolve(undefined))
+        return (await pathExists(scopedPath))
+          ? {
+              file: normalizedPath,
+              path: scopedPath,
+              scope: scopeKey,
+            }
+          : undefined
+      },
+      Promise.resolve(undefined),
+    )
 
   if (scopedSourceFile) {
     return scopedSourceFile

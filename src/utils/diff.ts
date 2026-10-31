@@ -1,7 +1,7 @@
 import { open, readFile } from 'fs/promises'
-import { pathExists } from 'fs-extra'
-import { diffLines } from 'diff'
 import chalk from 'chalk'
+import { diffLines } from 'diff'
+import { pathExists } from 'fs-extra'
 
 const isTextFile = async (filePath: string): Promise<boolean> => {
   let handle: Awaited<ReturnType<typeof open>> | undefined

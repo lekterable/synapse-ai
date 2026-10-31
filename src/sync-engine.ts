@@ -1,6 +1,6 @@
 import { stat } from 'fs/promises'
-import { pathExists } from 'fs-extra'
 import { isAbsolute, resolve } from 'path'
+import { pathExists } from 'fs-extra'
 import type { ConfigManager } from './config'
 import {
   backupFile,

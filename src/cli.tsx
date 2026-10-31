@@ -2,11 +2,11 @@
 
 import meow from 'meow'
 import { getCommandHandler, registerCommand } from './commands'
-import type { CliFlags } from './commands/types'
 import { registerBlocksCommands } from './commands/blocks'
 import { registerProjectCommands } from './commands/project'
 import { registerSyncCommands } from './commands/sync'
-import { showVersion, showError } from './utils/output'
+import type { CliFlags } from './commands/types'
+import { showError, showVersion } from './utils/output'
 
 registerProjectCommands(registerCommand)
 registerSyncCommands(registerCommand)

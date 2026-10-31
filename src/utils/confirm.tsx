@@ -1,6 +1,6 @@
-import React, { useRef } from 'react'
-import { Box, Text, render, useInput } from 'ink'
 import chalk from 'chalk'
+import { Box, render, Text, useInput } from 'ink'
+import { type FC, useRef } from 'react'
 
 type ConfirmPromptProps = {
   message: string
@@ -8,7 +8,7 @@ type ConfirmPromptProps = {
   onSubmit: (value: boolean) => void
 }
 
-const ConfirmPrompt: React.FC<ConfirmPromptProps> = ({
+const ConfirmPrompt: FC<ConfirmPromptProps> = ({
   message,
   defaultValue,
   onSubmit,

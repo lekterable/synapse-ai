@@ -1,7 +1,7 @@
 import { readdir, readFile, stat, writeFile } from 'fs/promises'
-import { mkdirp, pathExists } from 'fs-extra'
 import { join, relative } from 'path'
 import { pathToFileURL } from 'url'
+import { mkdirp, pathExists } from 'fs-extra'
 import type { ConfigManager, ProjectMetadata } from './config'
 
 export type DoctorFindingLevel = 'error' | 'warning' | 'info'

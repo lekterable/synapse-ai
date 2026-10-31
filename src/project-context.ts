@@ -1,6 +1,6 @@
 import {
-  createConfigManager,
   type ConfigManager,
+  createConfigManager,
   type ProjectMetadata,
 } from './config'
 import {

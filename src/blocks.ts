@@ -26,9 +26,9 @@ const BLOCK =
 export type Block = { name: string; content: string }
 
 export const findBlocks = (text: string): Block[] =>
-  [...text.matchAll(BLOCK)].map(([, name, content]) => ({
-    name: name!,
-    content: content!.trim(),
+  [...text.matchAll(BLOCK)].map(([, name = '', content = '']) => ({
+    name,
+    content: content.trim(),
   }))
 
 // Replaces the content of every block that has a source; other blocks stay as they are.
@@ -36,11 +36,12 @@ export const replaceBlocks = (
   text: string,
   sources: Record<string, string>,
 ): string =>
-  text.replace(BLOCK, (match, name: string) =>
-    sources[name] === undefined
+  text.replace(BLOCK, (match, name: string) => {
+    const source = sources[name]
+    return source === undefined
       ? match
-      : `<!-- synapse:${name} -->\n${sources[name]!.trim()}\n<!-- /synapse:${name} -->`,
-  )
+      : `<!-- synapse:${name} -->\n${source.trim()}\n<!-- /synapse:${name} -->`
+  })
 
 export const blocksDir = (sourcePath: string): string =>
   join(sourcePath, 'blocks')
@@ -75,16 +76,19 @@ export const blockStates = (
     BLOCK_FILES.map((file) => join(repo, file))
       .filter((path) => existsSync(path))
       .flatMap((path) =>
-        findBlocks(readFileSync(path, 'utf8')).map(({ name, content }) => ({
-          repo,
-          file: path,
-          name,
-          state:
-            sources[name] === undefined
-              ? ('no-source' as const)
-              : content === sources[name]!.trim()
-                ? ('in-sync' as const)
-                : ('drifted' as const),
-        })),
+        findBlocks(readFileSync(path, 'utf8')).map(({ name, content }) => {
+          const source = sources[name]
+          return {
+            repo,
+            file: path,
+            name,
+            state:
+              source === undefined
+                ? ('no-source' as const)
+                : content === source.trim()
+                  ? ('in-sync' as const)
+                  : ('drifted' as const),
+          }
+        }),
       ),
   )

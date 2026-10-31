@@ -1,22 +1,11 @@
-import { render, Text, Box } from 'ink'
-import chalk from 'chalk'
 import { homedir } from 'os'
+import chalk from 'chalk'
+import { Box, render, Text } from 'ink'
 import {
   getCommandFileBasePath,
   getMissingProjectErrorDetails,
   resolveProjectContext,
 } from '../project-context'
-import {
-  addFile,
-  applySyncPlan,
-  buildSyncPlan,
-  detectConflicts,
-  getStatusColor,
-  type ConflictStrategy,
-  type FileStatus,
-  type SyncPlanItem,
-  type SyncPlanReason,
-} from '../sync-engine'
 import {
   ensureSourceDir,
   formatScopeForDisplay,
@@ -24,14 +13,25 @@ import {
   resolveEffectiveSourceFile,
   validateScopeName,
 } from '../source'
-import { diffFiles } from '../utils/diff'
+import {
+  addFile,
+  applySyncPlan,
+  buildSyncPlan,
+  type ConflictStrategy,
+  detectConflicts,
+  type FileStatus,
+  getStatusColor,
+  type SyncPlanItem,
+  type SyncPlanReason,
+} from '../sync-engine'
 import { confirm } from '../utils/confirm'
+import { diffFiles } from '../utils/diff'
+import { print, showError, showSuccess, showWarning } from '../utils/output'
 import { toProjectRelativePath } from '../utils/paths'
 import {
   ensureProjectOwnsPath,
   NestedProjectOwnershipError,
 } from '../utils/project-root'
-import { showError, showSuccess, showWarning } from '../utils/output'
 import type { CommandHandler } from './types'
 
 const CONFLICT_STRATEGIES: ConflictStrategy[] = [
@@ -71,7 +71,7 @@ const renderPlan = (plan: SyncPlanItem[]): void => {
   const maxFileLength = Math.max(...plan.map((item) => item.file.length), 20)
   const padding = maxFileLength + 2
 
-  console.log(
+  print(
     [
       chalk.bold('Sync Plan'),
       `${chalk.bold('File'.padEnd(padding))}State`,
@@ -149,10 +149,10 @@ const resolveRequiredProjectContext = (
   const context = resolveProjectContext(rootFlag)
 
   if (!context) {
-    showError(getMissingProjectErrorDetails(rootFlag))
+    return showError(getMissingProjectErrorDetails(rootFlag))
   }
 
-  return context!
+  return context
 }
 
 const parseSourceTargetScope = (
