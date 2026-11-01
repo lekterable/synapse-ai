@@ -213,8 +213,8 @@ importers:
         specifier: 0.27.3
         version: 0.27.3
       perfekt:
-        specifier: 4.1.0
-        version: 4.1.0(@biomejs/biome@2.5.15)
+        specifier: 4.2.0
+        version: 4.2.0(@biomejs/biome@2.5.15)
       tsup:
         specifier: 8.5.1
         version: 8.5.1(postcss@8.5.8)(typescript@5.9.3)(yaml@2.8.1)
@@ -934,8 +934,8 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  perfekt@4.1.0:
-    resolution: {integrity: sha512-Ln1r/ZlJeFNOBAC0vjdb9ps7H9IIrGI2G8z5D2/B5e3/gfpWHgRqg22j/n5N7J5efUF0ArNl8tRRTP5i55XsDQ==}
+  perfekt@4.2.0:
+    resolution: {integrity: sha512-YP6EUJg4qVl6aHTCNxN4Cw2dmj0nO1kker0v8alcMMUa5xgAKr1i+1osmBldT5lPcs6uJt3FSCAvNB3e1rpfJA==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -1822,7 +1822,7 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  perfekt@4.1.0(@biomejs/biome@2.5.15):
+  perfekt@4.2.0(@biomejs/biome@2.5.15):
     optionalDependencies:
       '@biomejs/biome': 2.5.15
 
