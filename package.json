@@ -38,11 +38,11 @@
     "format": "biome check --write",
     "lint": "biome check",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "pnpm -s validate",
+    "prepublishOnly": "pnpm -s verify",
     "release": "perfekt release new",
     "test": "pnpm -s build && vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "pnpm -s typecheck && pnpm -s lint && pnpm -s test"
+    "verify": "perfekt ci"
   },
   "dependencies": {
     "chalk": "5.6.2",
