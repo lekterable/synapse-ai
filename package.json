@@ -38,7 +38,7 @@
     "format": "biome check --write",
     "lint": "biome check",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "pnpm -s verify",
+    "prepublishOnly": "pnpm -s verify && pnpm -s build",
     "release": "perfekt release new",
     "test": "pnpm -s build && vitest run",
     "typecheck": "tsc --noEmit",
