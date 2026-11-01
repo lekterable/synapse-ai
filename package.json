@@ -38,11 +38,11 @@
     "format": "biome check --write",
     "lint": "biome check",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "pnpm -s validate",
+    "prepublishOnly": "pnpm -s verify && pnpm -s build",
     "release": "perfekt release new",
     "test": "pnpm -s build && vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "pnpm -s typecheck && pnpm -s lint && pnpm -s test"
+    "verify": "perfekt ci"
   },
   "dependencies": {
     "chalk": "5.6.2",
@@ -62,7 +62,7 @@
     "@types/node": "25.3.5",
     "@types/react": "19.2.14",
     "esbuild": "0.27.3",
-    "perfekt": "4.1.0",
+    "perfekt": "4.2.0",
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vitest": "4.0.18"
