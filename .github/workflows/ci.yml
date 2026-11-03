@@ -9,8 +9,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate
+  verify:
+    name: Verify
     permissions:
       contents: read
     uses: lekterable/perfekt/.github/workflows/ci.yml@master

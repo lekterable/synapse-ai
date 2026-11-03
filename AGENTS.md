@@ -49,3 +49,7 @@ fix: add new CLI commands  # Wrong type - this is a feature
 - Missing type → Always start with `feat:`, `fix:`, etc.
 - Vague subjects → Be specific: "add CLI router" not "update code"
 - Wrong type → `feat:` for new features, `fix:` for bug fixes
+
+# Checks
+
+Before pushing, run `pnpm verify` (`perfekt ci`: install, commits, lint, typecheck, test and build on a clean checkout of HEAD). `prepublishOnly` runs it, then builds `dist/` in place for the publish.
