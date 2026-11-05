@@ -4,6 +4,8 @@ Sync config files, rules, and templates from a source location to multiple proje
 
 ## Install
 
+Requires Node.js 26 or later.
+
 ```bash
 npm install -g synapse-ai
 ```
