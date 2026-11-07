@@ -1,9 +1,11 @@
 name: Commitlint
 
+# CI lints the PR title on every run, so this only catches a title edited after
+# the last push. Pushes, body-only edits and drafts start no job.
 on:
   pull_request:
     branches: [master]
-    types: [opened, edited, reopened, synchronize]
+    types: [edited]
 
 jobs:
   conventional-commits:
