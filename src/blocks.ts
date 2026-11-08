@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
+import { BLOCKS_DIRECTORY } from './source'
 
 // A block is a marked region inside a file that otherwise belongs to the repo, like the
 // shared "Code conventions" section of every CLAUDE.md:
@@ -44,7 +45,7 @@ export const replaceBlocks = (
   })
 
 export const blocksDir = (sourcePath: string): string =>
-  join(sourcePath, 'blocks')
+  join(sourcePath, BLOCKS_DIRECTORY)
 
 const expandHome = (path: string): string =>
   path === '~' || path.startsWith('~/') ? join(homedir(), path.slice(1)) : path
