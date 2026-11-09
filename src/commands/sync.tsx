@@ -287,7 +287,12 @@ const syncHandler: CommandHandler = async (input, flags) => {
       showWarning(`Would track ${untracked.length} identical file(s).`)
     } else {
       const tracked = await applySyncPlan(untracked, configManager, false)
-      showSuccess(`Tracked ${tracked} identical file(s).`)
+      if (tracked > 0) {
+        showSuccess(`Tracked ${tracked} identical file(s).`)
+      }
+      if (tracked < untracked.length) {
+        showWarning(`Failed to track ${untracked.length - tracked} file(s).`)
+      }
     }
   }
 
@@ -295,7 +300,9 @@ const syncHandler: CommandHandler = async (input, flags) => {
     (item) => item.needsSync && item.reason !== 'in-sync',
   )
   if (actionable.length === 0) {
-    showWarning('All tracked files are already in sync.')
+    if (untracked.length === 0) {
+      showWarning('All tracked files are already in sync.')
+    }
     return
   }
 
