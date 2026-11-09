@@ -152,7 +152,7 @@ Some text has to be identical across repos but lives inside a file each repo own
 <!-- /synapse:code-conventions -->
 ```
 
-The canonical text lives in `<sourcePath>/blocks/code-conventions.md`. `synapse blocks` looks in `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` and `GEMINI.md` of every repo, and only touches files that carry the markers, so a repo opts in by adding them. Blocks need no `synapse init`.
+The canonical text lives in `<sourcePath>/blocks/code-conventions.md`. That directory is an internal store: `synapse sync` does not copy `blocks/` into projects. `synapse blocks` looks in `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` and `GEMINI.md` of every repo, and only touches files that carry the markers, so a repo opts in by adding them. Blocks need no `synapse init`.
 
 ```bash
 # Edited the block in one repo? Make it the source
