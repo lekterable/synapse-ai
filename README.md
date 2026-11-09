@@ -206,7 +206,7 @@ synapse blocks sync --repos ~/.config/projects.yaml
 - In a scoped project, `synapse add <path> --shared` writes to the shared layer instead
 - A scoped project reads from shared plus every scoped source whose scopes are contained by the project scope
 - A `web,react` project receives `web`, `react`, and `react+web` scoped files
-- The `scopes/` directory inside the source store is reserved for Synapse internals
+- The `scopes/` and `blocks/` directories inside the source store are reserved for Synapse internals: neither is copied into projects, and `add`, `remove` and `diff` refuse paths under them
 - Parent projects cannot add, diff, status, or sync files that belong to a nested Synapse project; run those commands from the nested root instead
 
 ## Doctor Checks

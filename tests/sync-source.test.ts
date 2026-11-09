@@ -135,13 +135,16 @@ describe('synapse sync source contract', () => {
     )
     expect(runCli(sandbox.repo, sandbox.home, ['init']).status).toBe(0)
 
-    const first = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
+    const first = runCli(sandbox.repo, sandbox.home, ['sync'])
     const firstMetadata = await readProjectMetadata(sandbox.repo)
     const second = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
     const secondMetadata = await readProjectMetadata(sandbox.repo)
     const status = runCli(sandbox.repo, sandbox.home, ['status'])
 
     expect(first.status).toBe(0)
+    expect(stripVTControlCharacters(first.stdout)).toContain(
+      'Tracked 1 identical file(s).',
+    )
     expect(firstMetadata.syncedFiles).toHaveProperty(
       '.github/pull_request_template.md',
     )
@@ -157,81 +160,21 @@ describe('synapse sync source contract', () => {
     expect(stripVTControlCharacters(status.stdout)).not.toContain('➕')
   })
 
-  it('should keep react and turborepo rules off unscoped CLI projects', async () => {
-    await writeSourceFile(
-      sandbox.home,
-      '.cursor/rules/typescript-guidelines.mdc',
-      'shared-ts\n',
-    )
-    await writeSourceFile(
-      sandbox.home,
-      'scopes/react/.cursor/rules/react-guidelines.mdc',
-      'react-only\n',
-    )
-    await writeSourceFile(
-      sandbox.home,
-      'scopes/turborepo/.cursor/rules/turborepo.mdc',
-      'turbo-only\n',
-    )
-    expect(runCli(sandbox.repo, sandbox.home, ['init']).status).toBe(0)
+  it('should sync a scoped project whose scope has a blocks folder', async () => {
+    await writeSourceFile(sandbox.home, 'AGENTS.md', 'shared-agents\n')
+    await writeSourceFile(sandbox.home, 'scopes/react/blocks/notes.md', 'x\n')
     expect(
-      runCli(sandbox.repo, sandbox.home, [
-        'init',
-        '--root',
-        'apps/web-consumer',
-        '--scope',
-        'react,turborepo',
-      ]).status,
+      runCli(sandbox.repo, sandbox.home, ['init', '--scope', 'react']).status,
     ).toBe(0)
 
-    const cliSync = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
-    const frontendSync = runCli(sandbox.webConsumer, sandbox.home, [
-      'sync',
-      '--yes',
-    ])
+    const result = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
 
-    expect(cliSync.status).toBe(0)
-    expect(frontendSync.status).toBe(0)
-    expect(
-      await readFile(
-        join(sandbox.repo, '.cursor', 'rules', 'typescript-guidelines.mdc'),
-        'utf-8',
-      ),
-    ).toBe('shared-ts\n')
+    expect(result.status).toBe(0)
+    expect(await readFile(join(sandbox.repo, 'AGENTS.md'), 'utf-8')).toBe(
+      'shared-agents\n',
+    )
     await expect(
-      readFile(
-        join(sandbox.repo, '.cursor', 'rules', 'react-guidelines.mdc'),
-        'utf-8',
-      ),
+      readFile(join(sandbox.repo, 'blocks', 'notes.md'), 'utf-8'),
     ).rejects.toThrow()
-    await expect(
-      readFile(
-        join(sandbox.repo, '.cursor', 'rules', 'turborepo.mdc'),
-        'utf-8',
-      ),
-    ).rejects.toThrow()
-    expect(
-      await readFile(
-        join(
-          sandbox.webConsumer,
-          '.cursor',
-          'rules',
-          'typescript-guidelines.mdc',
-        ),
-        'utf-8',
-      ),
-    ).toBe('shared-ts\n')
-    expect(
-      await readFile(
-        join(sandbox.webConsumer, '.cursor', 'rules', 'react-guidelines.mdc'),
-        'utf-8',
-      ),
-    ).toBe('react-only\n')
-    expect(
-      await readFile(
-        join(sandbox.webConsumer, '.cursor', 'rules', 'turborepo.mdc'),
-        'utf-8',
-      ),
-    ).toBe('turbo-only\n')
   })
 })

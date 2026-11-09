@@ -7,7 +7,7 @@ import { normalizeRelativePath, resolveWithin } from './utils/paths'
 
 export const SCOPES_DIRECTORY = 'scopes'
 export const BLOCKS_DIRECTORY = 'blocks'
-export const RESERVED_SOURCE_DIRECTORIES = [
+const RESERVED_SOURCE_DIRECTORIES = [
   SCOPES_DIRECTORY,
   BLOCKS_DIRECTORY,
 ] as const
@@ -25,8 +25,9 @@ const isReservedSourceRelativePath = (relativeFilePath: string): boolean => {
   )
 }
 
-export const reservedSourceNamespaceHint = (): string =>
-  RESERVED_SOURCE_DIRECTORIES.map((directory) => `"${directory}/"`).join(' or ')
+export const reservedSourceNamespaceHint = RESERVED_SOURCE_DIRECTORIES.map(
+  (directory) => `"${directory}/"`,
+).join(' or ')
 
 export type SourceFileLocation = {
   file: string
@@ -299,6 +300,8 @@ export const listEffectiveSourceFiles = async (
         (
           await listSourceFiles(
             resolveWithin(sourceRoot, join(SCOPES_DIRECTORY, scopeKey)),
+            undefined,
+            true,
           )
         ).map(
           (file) =>
