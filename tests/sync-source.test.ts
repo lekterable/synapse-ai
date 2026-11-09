@@ -145,6 +145,9 @@ describe('synapse sync source contract', () => {
     expect(stripVTControlCharacters(first.stdout)).toContain(
       'Tracked 1 identical file(s).',
     )
+    expect(stripVTControlCharacters(first.stdout)).not.toContain(
+      'All tracked files are already in sync.',
+    )
     expect(firstMetadata.syncedFiles).toHaveProperty(
       '.github/pull_request_template.md',
     )
