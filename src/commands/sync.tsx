@@ -122,7 +122,7 @@ const resolveConflictSelection = async (
     })
   }
 
-  return conflicts.reduce<Promise<ConflictResolution>(
+  return conflicts.reduce<Promise<ConflictResolution>>(
     async (resolutionPromise, conflictItem) => {
       const resolution = await resolutionPromise
       const overwrite = await confirm(
