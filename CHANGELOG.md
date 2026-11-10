@@ -1,3 +1,24 @@
+# 1.7.0
+
+## Features
+
+- require node 26 (#8) 6a966855
+- sync shared blocks inside files across repos (#1) af4eeebc
+
+## Fixes
+
+- skip reserved scope folders, track identical files (#10) 81f7ccf1
+- require node 20 like its dependencies (#4) f0dac8a3
+
+## Misc
+
+- run CI on ready PRs only and quote prompts (#9) 063b8d42
+- bump perfekt to 4.3.0 and add pnpm verify (#7) 6440b4fb
+- fix findings from perfekt's stricter rules (#6) c7e59007
+- lint with perfekt's biome config (#5) 73d107b6
+- move to perfekt 4.1.0 and its shared tsconfig (#3) f462a53f
+- pin pnpm 12.15.0 (#2) 0eb86c2a
+
 # 1.6.0
 
 ## Features
