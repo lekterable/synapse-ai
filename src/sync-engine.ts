@@ -149,12 +149,13 @@ const buildSyncPlanItem = async (
 
   const projectHash = await getFileHash(projectFilePath)
   if (projectHash === sourceHash) {
+    const storedHash = getMetadataEntry(metadata.fileHashes, file)
     return {
       file,
       sourceFilePath: sourceFile.path,
       projectFilePath,
       reason: 'in-sync',
-      needsSync: false,
+      needsSync: storedHash !== sourceHash,
       hasConflict: false,
       projectExists: true,
     }
@@ -247,11 +248,14 @@ const applySyncPlanItem = async (
   }
 
   try {
-    if (backupEnabled && item.projectExists) {
-      await backupFile(item.projectFilePath, backupPath)
+    if (item.reason !== 'in-sync') {
+      if (backupEnabled && item.projectExists) {
+        await backupFile(item.projectFilePath, backupPath)
+      }
+
+      await copyFileAtomic(item.sourceFilePath, item.projectFilePath)
     }
 
-    await copyFileAtomic(item.sourceFilePath, item.projectFilePath)
     const hash = await getFileHash(item.projectFilePath)
     const stats = await stat(item.projectFilePath)
 

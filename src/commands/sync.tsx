@@ -10,6 +10,7 @@ import {
   ensureSourceDir,
   formatScopeForDisplay,
   removeSourcePath,
+  reservedSourceNamespaceHint,
   resolveEffectiveSourceFile,
   validateScopeName,
 } from '../source'
@@ -253,8 +254,7 @@ const syncHandler: CommandHandler = async (input, flags) => {
     showError({
       problem: 'Cannot build sync plan',
       reason: error instanceof Error ? error.message : String(error),
-      solution:
-        'Use a file path inside the selected project root and avoid the reserved "scopes/" namespace',
+      solution: `Use a file path inside the selected project root and avoid the reserved ${reservedSourceNamespaceHint} namespace`,
     })
     return
   }
@@ -278,9 +278,31 @@ const syncHandler: CommandHandler = async (input, flags) => {
 
   renderPlan(plan)
 
-  const actionable = plan.filter((item) => item.needsSync)
+  // Identical files with no stored hash only need their hash recorded: no file changes, so no prompt.
+  const untracked = plan.filter(
+    (item) => item.needsSync && item.reason === 'in-sync',
+  )
+  if (untracked.length > 0) {
+    if (dryRun) {
+      showWarning(`Would track ${untracked.length} identical file(s).`)
+    } else {
+      const tracked = await applySyncPlan(untracked, configManager, false)
+      if (tracked > 0) {
+        showSuccess(`Tracked ${tracked} identical file(s).`)
+      }
+      if (tracked < untracked.length) {
+        showWarning(`Failed to track ${untracked.length - tracked} file(s).`)
+      }
+    }
+  }
+
+  const actionable = plan.filter(
+    (item) => item.needsSync && item.reason !== 'in-sync',
+  )
   if (actionable.length === 0) {
-    showWarning('All tracked files are already in sync.')
+    if (untracked.length === 0) {
+      showWarning('All tracked files are already in sync.')
+    }
     return
   }
 
@@ -408,8 +430,7 @@ const addHandler: CommandHandler = async (input, flags) => {
   } else {
     showError({
       problem: `Cannot add path: ${file}`,
-      reason:
-        'Path may not exist, may be outside the selected project root, may be fully ignored, or may use the reserved "scopes/" namespace',
+      reason: `Path may not exist, may be outside the selected project root, may be fully ignored, or may use the reserved ${reservedSourceNamespaceHint} namespace`,
       solution:
         'Ensure the path exists inside the selected project, contains addable files, and use --shared or --scope appropriately',
     })
@@ -464,8 +485,7 @@ const removeHandler: CommandHandler = async (input, flags) => {
     showError({
       problem: `Cannot remove path: ${file}`,
       reason: error instanceof Error ? error.message : String(error),
-      solution:
-        'Use a path inside the selected project root and avoid the reserved "scopes/" namespace',
+      solution: `Use a path inside the selected project root and avoid the reserved ${reservedSourceNamespaceHint} namespace`,
     })
     return
   }
@@ -600,8 +620,7 @@ const diffHandler: CommandHandler = async (input, flags) => {
     showError({
       problem: `Cannot diff file: ${file}`,
       reason: error instanceof Error ? error.message : String(error),
-      solution:
-        'Use a file path inside the selected project root and avoid the reserved "scopes/" namespace',
+      solution: `Use a file path inside the selected project root and avoid the reserved ${reservedSourceNamespaceHint} namespace`,
     })
     return
   }

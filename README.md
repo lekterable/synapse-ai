@@ -152,7 +152,7 @@ Some text has to be identical across repos but lives inside a file each repo own
 <!-- /synapse:code-conventions -->
 ```
 
-The canonical text lives in `<sourcePath>/blocks/code-conventions.md`. `synapse blocks` looks in `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` and `GEMINI.md` of every repo, and only touches files that carry the markers, so a repo opts in by adding them. Blocks need no `synapse init`.
+The canonical text lives in `<sourcePath>/blocks/code-conventions.md`. That directory is an internal store: `synapse sync` does not copy `blocks/` into projects. `synapse blocks` looks in `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` and `GEMINI.md` of every repo, and only touches files that carry the markers, so a repo opts in by adding them. Blocks need no `synapse init`.
 
 ```bash
 # Edited the block in one repo? Make it the source
@@ -206,7 +206,7 @@ synapse blocks sync --repos ~/.config/projects.yaml
 - In a scoped project, `synapse add <path> --shared` writes to the shared layer instead
 - A scoped project reads from shared plus every scoped source whose scopes are contained by the project scope
 - A `web,react` project receives `web`, `react`, and `react+web` scoped files
-- The `scopes/` directory inside the source store is reserved for Synapse internals
+- The `scopes/` and `blocks/` directories inside the source store are reserved for Synapse internals: neither is copied into projects, and `add`, `remove` and `diff` refuse paths under them
 - Parent projects cannot add, diff, status, or sync files that belong to a nested Synapse project; run those commands from the nested root instead
 
 ## Doctor Checks

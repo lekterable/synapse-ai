@@ -6,6 +6,28 @@ import type { ConfigManager } from './config'
 import { normalizeRelativePath, resolveWithin } from './utils/paths'
 
 export const SCOPES_DIRECTORY = 'scopes'
+export const BLOCKS_DIRECTORY = 'blocks'
+const RESERVED_SOURCE_DIRECTORIES = [
+  SCOPES_DIRECTORY,
+  BLOCKS_DIRECTORY,
+] as const
+
+const isReservedSourceDirectoryName = (name: string): boolean =>
+  (RESERVED_SOURCE_DIRECTORIES as readonly string[]).includes(name)
+
+const isReservedSourceRelativePath = (relativeFilePath: string): boolean => {
+  const normalizedPath = normalizeRelativePath(relativeFilePath)
+
+  return RESERVED_SOURCE_DIRECTORIES.some(
+    (directory) =>
+      normalizedPath === directory ||
+      normalizedPath.startsWith(`${directory}/`),
+  )
+}
+
+export const reservedSourceNamespaceHint = RESERVED_SOURCE_DIRECTORIES.map(
+  (directory) => `"${directory}/"`,
+).join(' or ')
 
 export type SourceFileLocation = {
   file: string
@@ -31,7 +53,7 @@ const createDirectories = async (basePath: string): Promise<void> => {
 const listSourceFiles = async (
   rootDir: string,
   currentDir: string = rootDir,
-  skipScopesAtRoot: boolean = false,
+  skipReservedAtRoot: boolean = false,
 ): Promise<string[]> => {
   if (!(await pathExists(rootDir))) {
     return []
@@ -41,9 +63,9 @@ const listSourceFiles = async (
   const nestedFiles = await Promise.all(
     entries.map(async (entry) => {
       if (
-        skipScopesAtRoot &&
+        skipReservedAtRoot &&
         currentDir === rootDir &&
-        entry.name === SCOPES_DIRECTORY
+        isReservedSourceDirectoryName(entry.name)
       ) {
         return []
       }
@@ -118,11 +140,7 @@ const isScopeSubset = (sourceScope: string, projectScope: string): boolean => {
 const assertAllowedSourceRelativePath = (relativeFilePath: string): string => {
   const normalizedPath = normalizeRelativePath(relativeFilePath)
 
-  if (
-    !normalizedPath ||
-    normalizedPath === SCOPES_DIRECTORY ||
-    normalizedPath.startsWith(`${SCOPES_DIRECTORY}/`)
-  ) {
+  if (!normalizedPath || isReservedSourceRelativePath(normalizedPath)) {
     throw new Error(`Path uses reserved source namespace: ${relativeFilePath}`)
   }
 
@@ -282,6 +300,8 @@ export const listEffectiveSourceFiles = async (
         (
           await listSourceFiles(
             resolveWithin(sourceRoot, join(SCOPES_DIRECTORY, scopeKey)),
+            undefined,
+            true,
           )
         ).map(
           (file) =>
