@@ -1,5 +1,14 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readlink,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
@@ -179,5 +188,65 @@ describe('synapse sync source contract', () => {
     await expect(
       readFile(join(sandbox.repo, 'blocks', 'notes.md'), 'utf-8'),
     ).rejects.toThrow()
+  })
+
+  it('should sync a relative symlink as a link, skip escaping or dangling ones, and not replace a directory', async () => {
+    const skill = '.agents/skills/turborepo/SKILL.md'
+    await writeSourceFile(sandbox.home, `scopes/turborepo/${skill}`, 'skill\n')
+    const links = join(
+      getSourceRoot(sandbox.home),
+      'scopes',
+      'turborepo',
+      '.claude',
+      'skills',
+    )
+    await mkdir(links, { recursive: true })
+    await symlink('../../.agents/skills/turborepo', join(links, 'turborepo'))
+    await symlink('../../../../outside', join(links, 'escape'))
+    await symlink('../../.agents/skills/missing', join(links, 'dangling'))
+    await mkdir(join(sandbox.repo, '.claude', 'skills', 'blocked'), {
+      recursive: true,
+    })
+    await symlink('../../.agents/skills/turborepo', join(links, 'blocked'))
+    expect(
+      runCli(sandbox.repo, sandbox.home, ['init', '--scope', 'turborepo'])
+        .status,
+    ).toBe(0)
+
+    const first = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
+    const linkPath = join(sandbox.repo, '.claude', 'skills', 'turborepo')
+    const second = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
+
+    expect(first.status).toBe(0)
+    expect(first.stderr).toContain('Skipping .claude/skills/escape')
+    expect(first.stderr).toContain('Skipping .claude/skills/dangling')
+    expect(first.stderr).toContain(
+      'Failed to sync .claude/skills/blocked: a directory is in the way',
+    )
+    expect((await lstat(linkPath)).isSymbolicLink()).toBe(true)
+    expect(await readlink(linkPath)).toBe('../../.agents/skills/turborepo')
+    expect(await readFile(join(linkPath, 'SKILL.md'), 'utf-8')).toBe('skill\n')
+    await expect(
+      lstat(join(sandbox.repo, '.claude', 'skills', 'escape')),
+    ).rejects.toThrow()
+    expect(stripVTControlCharacters(second.stdout)).toMatch(
+      /\.claude\/skills\/turborepo +in sync/,
+    )
+  })
+  it('should keep a project link to a file that matches the source in sync', async () => {
+    await writeSourceFile(sandbox.home, 'CLAUDE.md', 'rules\n')
+    await writeFile(join(sandbox.repo, 'AGENTS.md'), 'rules\n', 'utf-8')
+    await symlink('AGENTS.md', join(sandbox.repo, 'CLAUDE.md'))
+    expect(runCli(sandbox.repo, sandbox.home, ['init']).status).toBe(0)
+
+    const result = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
+
+    expect(result.status).toBe(0)
+    expect(stripVTControlCharacters(result.stdout)).toContain(
+      'Tracked 1 identical file(s).',
+    )
+    expect(
+      (await lstat(join(sandbox.repo, 'CLAUDE.md'))).isSymbolicLink(),
+    ).toBe(true)
   })
 })

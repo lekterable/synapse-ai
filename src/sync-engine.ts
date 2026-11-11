@@ -1,12 +1,17 @@
-import { stat } from 'node:fs/promises'
+import { lstat, stat } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathExists } from 'fs-extra'
 import type { ConfigManager } from './config'
 import {
+  assertNoDirectory,
   backupFile,
   copyFileAtomic,
+  copyLinkAtomic,
+  entryExists,
+  getEntryHash,
   getFileHash,
   isIgnored,
+  isLink,
   listDirectoryFiles,
 } from './file-manager'
 import {
@@ -50,6 +55,7 @@ export type SyncPlanItem = {
   needsSync: boolean
   hasConflict: boolean
   projectExists: boolean
+  link: boolean
 }
 
 type SyncAccumulator = {
@@ -107,7 +113,9 @@ const buildSyncPlanItem = async (
   const sourceFile = await resolveEffectiveSourceFile(sourceRoot, file, scope)
   const sourceFilePath =
     sourceFile?.path ?? resolveSharedSourcePath(sourceRoot, file)
-  const projectExists = await pathExists(projectFilePath)
+  const link = sourceFile !== undefined && (await isLink(sourceFile.path))
+  const hashOf = link ? getEntryHash : getFileHash
+  const projectExists = await (link ? entryExists : pathExists)(projectFilePath)
 
   if (!sourceFile) {
     return {
@@ -118,6 +126,7 @@ const buildSyncPlanItem = async (
       needsSync: false,
       hasConflict: false,
       projectExists,
+      link,
     }
   }
 
@@ -130,10 +139,11 @@ const buildSyncPlanItem = async (
       needsSync: false,
       hasConflict: false,
       projectExists,
+      link,
     }
   }
 
-  const sourceHash = await getFileHash(sourceFile.path)
+  const sourceHash = await hashOf(sourceFile.path)
 
   if (!projectExists) {
     return {
@@ -144,10 +154,11 @@ const buildSyncPlanItem = async (
       needsSync: true,
       hasConflict: false,
       projectExists: false,
+      link,
     }
   }
 
-  const projectHash = await getFileHash(projectFilePath)
+  const projectHash = await hashOf(projectFilePath)
   if (projectHash === sourceHash) {
     const storedHash = getMetadataEntry(metadata.fileHashes, file)
     return {
@@ -158,6 +169,7 @@ const buildSyncPlanItem = async (
       needsSync: storedHash !== sourceHash,
       hasConflict: false,
       projectExists: true,
+      link,
     }
   }
 
@@ -176,6 +188,7 @@ const buildSyncPlanItem = async (
     needsSync: true,
     hasConflict,
     projectExists: true,
+    link,
   }
 }
 
@@ -249,15 +262,24 @@ const applySyncPlanItem = async (
 
   try {
     if (item.reason !== 'in-sync') {
+      if (item.link) {
+        await assertNoDirectory(item.projectFilePath)
+      }
+
       if (backupEnabled && item.projectExists) {
         await backupFile(item.projectFilePath, backupPath)
       }
 
-      await copyFileAtomic(item.sourceFilePath, item.projectFilePath)
+      await (item.link ? copyLinkAtomic : copyFileAtomic)(
+        item.sourceFilePath,
+        item.projectFilePath,
+      )
     }
 
-    const hash = await getFileHash(item.projectFilePath)
-    const stats = await stat(item.projectFilePath)
+    const hash = await (item.link ? getEntryHash : getFileHash)(
+      item.projectFilePath,
+    )
+    const stats = await (item.link ? lstat : stat)(item.projectFilePath)
 
     return {
       count: accumulator.count + 1,
@@ -439,7 +461,11 @@ export const detectConflicts = async (
           return undefined
         }
 
-        const projectExists = await pathExists(projectFilePath)
+        const link = await isLink(sourceFilePath)
+        const hashOf = link ? getEntryHash : getFileHash
+        const projectExists = await (link ? entryExists : pathExists)(
+          projectFilePath,
+        )
         const lastSync = getMetadataEntry(metadata.syncedFiles, file)
 
         if (!projectExists) {
@@ -451,8 +477,8 @@ export const detectConflicts = async (
         }
 
         const [projectHash, sourceHash] = await Promise.all([
-          getFileHash(projectFilePath),
-          getFileHash(sourceFilePath),
+          hashOf(projectFilePath),
+          hashOf(sourceFilePath),
         ])
         const storedHash = getMetadataEntry(metadata.fileHashes, file)
 

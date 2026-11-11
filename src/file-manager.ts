@@ -1,5 +1,15 @@
 import { createHash } from 'node:crypto'
-import { copyFile, mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rename,
+  rm,
+  symlink,
+} from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { move } from 'fs-extra'
 import { minimatch } from 'minimatch'
@@ -71,6 +81,61 @@ export const copyFileAtomic = async (
   }
 }
 
+// A symlink in the source syncs as the same symlink. These helpers handle entries whose source
+// is a link; files keep the copy and content hash below, which follow links as before.
+export const isLink = async (path: string): Promise<boolean> =>
+  lstat(path).then(
+    (stats) => stats.isSymbolicLink(),
+    () => false,
+  )
+
+// Like pathExists, but true for a link whose target is missing too.
+export const entryExists = async (path: string): Promise<boolean> =>
+  lstat(path).then(
+    () => true,
+    () => false,
+  )
+
+// Hashes a link by where it points and a directory by being one, so comparing a synced link
+// with whatever sits at that path in a project never reads a directory as a file.
+export const getEntryHash = async (path: string): Promise<string> => {
+  const stats = await lstat(path)
+  const content = stats.isSymbolicLink()
+    ? `symlink:${await readlink(path)}`
+    : stats.isDirectory()
+      ? 'directory'
+      : await readFile(path)
+  return createHash('sha256').update(content).digest('hex')
+}
+
+// A synced link never replaces a real directory: that could hold the project's own files.
+export const assertNoDirectory = async (path: string): Promise<void> => {
+  const existing = await lstat(path).catch(() => undefined)
+  if (existing?.isDirectory()) {
+    throw new Error(
+      'a directory is in the way; move it out so the synced link can take its place',
+    )
+  }
+}
+
+export const copyLinkAtomic = async (
+  src: string,
+  dest: string,
+): Promise<void> => {
+  await assertNoDirectory(dest)
+  await ensureDirectory(dest)
+  const tmpPath = `${dest}.tmp`
+
+  try {
+    await rm(tmpPath, { force: true })
+    await symlink(await readlink(src), tmpPath)
+    await rename(tmpPath, dest)
+  } catch (error) {
+    await rm(tmpPath, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
+
 export const backupFile = async (
   filePath: string,
   backupDir: string,
@@ -81,7 +146,9 @@ export const backupFile = async (
   const fileName = basename(filePath)
   const backupPath = join(backupDir, `${timestamp}-${fileName}`)
 
-  await copyFile(filePath, backupPath)
+  await ((await isLink(filePath))
+    ? symlink(await readlink(filePath), backupPath)
+    : copyFile(filePath, backupPath))
   return backupPath
 }
 

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs'
-import { readdir, rm, stat } from 'node:fs/promises'
+import { lstat, readdir, readlink, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path'
 import { mkdirp, pathExists } from 'fs-extra'
 import type { ConfigManager } from './config'
 import { normalizeRelativePath, resolveWithin } from './utils/paths'
@@ -51,6 +51,34 @@ const createDirectories = async (basePath: string): Promise<void> => {
   ])
 }
 
+// A link syncs only when it is relative, stays inside the layer it is synced from and points at
+// something that layer syncs too, so it resolves to the same file in every project.
+const isSyncableLink = async (
+  absolutePath: string,
+  relativePath: string,
+  skipReservedAtRoot: boolean,
+): Promise<boolean> => {
+  const target = await readlink(absolutePath)
+  const resolved = normalizeRelativePath(
+    posix.join(posix.dirname(relativePath), target.split('\\').join('/')),
+  )
+  const syncable =
+    !isAbsolute(target) &&
+    resolved !== '' &&
+    resolved !== '..' &&
+    !resolved.startsWith('../') &&
+    !(skipReservedAtRoot && isReservedSourceRelativePath(resolved)) &&
+    (await pathExists(absolutePath))
+
+  if (!syncable) {
+    console.warn(
+      `Skipping ${relativePath}: a synced symlink must be relative and point at an existing file or folder in the same source layer`,
+    )
+  }
+
+  return syncable
+}
+
 const listSourceFiles = async (
   rootDir: string,
   currentDir: string = rootDir,
@@ -73,16 +101,27 @@ const listSourceFiles = async (
 
       const absolutePath = join(currentDir, entry.name)
       if (entry.isDirectory()) {
-        return listSourceFiles(rootDir, absolutePath)
+        return listSourceFiles(rootDir, absolutePath, skipReservedAtRoot)
+      }
+
+      const relativePath = normalizeRelativePath(
+        relative(rootDir, absolutePath),
+      )
+
+      if (entry.isSymbolicLink()) {
+        return (await isSyncableLink(
+          absolutePath,
+          relativePath,
+          skipReservedAtRoot,
+        ))
+          ? [relativePath]
+          : []
       }
 
       if (!entry.isFile()) {
         return []
       }
 
-      const relativePath = normalizeRelativePath(
-        relative(rootDir, absolutePath),
-      )
       return relativePath ? [relativePath] : []
     }),
   )
@@ -331,11 +370,11 @@ export const removeSourcePath = async (
     scope,
   )
 
-  if (!(await pathExists(targetPath))) {
+  const targetStats = await lstat(targetPath).catch(() => undefined)
+  if (!targetStats) {
     return undefined
   }
 
-  const targetStats = await stat(targetPath)
   const fileCount = targetStats.isDirectory()
     ? (await listSourceFiles(targetPath)).length
     : 1

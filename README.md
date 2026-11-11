@@ -209,6 +209,7 @@ A repo without `.synapse.json`, without a scope, or with a scope Synapse can't r
 11. `synapse sync` shows a sync plan and asks for confirmation before applying changes
 12. Before overwriting, backups are created in `~/.synapse/backups/`
 13. SHA256 hashes detect conflicts between source and local versions
+14. A symlink in the source syncs as the same symlink, so one skill can live in `.agents/skills/<name>/` with `.claude/skills/<name>` linking to it. The link must be relative and point at something that exists in the same layer (shared or one scope); other links are skipped with a warning, and a synced link never replaces a real directory in a project. Files keep their old behaviour: a project link to a file is compared by the file's content. `synapse add` stores what a link points to, not the link, so create links in the source by hand
 
 ## Shared vs Scoped
 
