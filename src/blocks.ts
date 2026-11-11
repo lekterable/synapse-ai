@@ -81,8 +81,9 @@ export const blockSources = (
     .reduce<Record<string, string>>(
       (sources, [name, text]) => ({
         ...sources,
-        [name]:
-          sources[name] === undefined ? text : `${sources[name]}\n\n${text}`,
+        [name]: [sources[name], text]
+          .filter((part) => part !== undefined && part !== '')
+          .join('\n\n'),
       }),
       {},
     )

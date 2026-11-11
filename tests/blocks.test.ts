@@ -63,7 +63,7 @@ describe('blocks', () => {
     ).toBe(doc('new rules'))
     expect(run('check').status).toBe(0)
   })
-  it('should stack shared and matching scoped parts, broadest scope first', async () => {
+  it('should stack shared and matching scoped parts, broadest scope first, skipping empty ones', async () => {
     const source = await mkdtemp(join(tmpdir(), 'synapse-block-source-'))
     onTestFinished(() => rm(source, { recursive: true, force: true }))
     const part = async (path: string, text: string) => {
@@ -73,6 +73,7 @@ describe('blocks', () => {
     await part('blocks/guides.md', 'shared\n')
     await part('scopes/react+web/blocks/guides.md', 'react web\n')
     await part('scopes/react/blocks/guides.md', 'react\n')
+    await part('scopes/web/blocks/guides.md', '\n')
     await part('scopes/mobile/blocks/guides.md', 'mobile\n')
     await part('scopes/react/blocks/only-react.md', 'only react\n')
 
