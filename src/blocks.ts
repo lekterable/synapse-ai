@@ -3,7 +3,12 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { createConfigManager } from './config'
-import { BLOCKS_DIRECTORY, matchingScopeKeys, SCOPES_DIRECTORY } from './source'
+import {
+  BLOCKS_DIRECTORY,
+  matchingScopes,
+  SCOPES_DIRECTORY,
+  validateScopeName,
+} from './source'
 
 // A block is a marked region inside a file that otherwise belongs to the repo, like the
 // shared "Code conventions" section of every CLAUDE.md:
@@ -68,8 +73,8 @@ export const blockSources = (
 ): Record<string, string> =>
   [
     blocksDir(sourcePath),
-    ...matchingScopeKeys(sourcePath, scope).map((key) =>
-      join(sourcePath, SCOPES_DIRECTORY, key, BLOCKS_DIRECTORY),
+    ...matchingScopes(sourcePath, scope).map(({ dir }) =>
+      join(dir, BLOCKS_DIRECTORY),
     ),
   ]
     .flatMap(readBlockFiles)
@@ -98,9 +103,16 @@ export const scopedBlockNames = (sourcePath: string): string[] => {
     : []
 }
 
-// The scope in a repo's .synapse.json; undefined when it has none or no .synapse.json.
-export const repoScope = (repo: string): string | undefined =>
-  createConfigManager(repo).getProjectMetadata().scope
+// The scope in a repo's .synapse.json; undefined when it has none, no .synapse.json, or a
+// scope Synapse can't read, so one broken repo doesn't stop blocks for the others.
+export const repoScope = (repo: string): string | undefined => {
+  const scope = createConfigManager(repo).getProjectMetadata().scope
+  try {
+    return scope === undefined ? undefined : validateScopeName(scope)
+  } catch {
+    return undefined
+  }
+}
 
 const expandHome = (path: string): string =>
   path === '~' || path.startsWith('~/') ? join(homedir(), path.slice(1)) : path

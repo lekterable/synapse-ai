@@ -83,7 +83,7 @@ const pull = (file: string | undefined, flags: CliFlags): void => {
   const stacked = blocks.filter(({ name }) => scoped.includes(name))
   if (stacked.length > 0)
     throw new Error(
-      `${stacked.map(({ name }) => name).join(', ')} stack scoped parts, so edit them in ${sourcePath} instead`,
+      `${stacked.map(({ name }) => name).join(', ')} ${stacked.length === 1 ? 'has' : 'have'} scoped parts, so edit ${stacked.length === 1 ? 'it' : 'them'} in ${sourcePath} instead`,
     )
   const dir = blocksDir(sourcePath)
   if (!flags.dryRun) mkdirSync(dir, { recursive: true })

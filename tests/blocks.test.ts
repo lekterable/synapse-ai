@@ -71,7 +71,7 @@ describe('blocks', () => {
       await writeFile(join(source, path), text)
     }
     await part('blocks/guides.md', 'shared\n')
-    await part('scopes/react+web/blocks/guides.md', 'react web\n')
+    await part('scopes/web+react/blocks/guides.md', 'react web\n')
     await part('scopes/react/blocks/guides.md', 'react\n')
     await part('scopes/mobile/blocks/guides.md', 'mobile\n')
     await part('scopes/react/blocks/only-react.md', 'only react\n')
@@ -83,7 +83,7 @@ describe('blocks', () => {
     expect(blockSources(source, undefined)).toEqual({ guides: 'shared' })
   })
 
-  it('should sync each repo with its own scope and refuse to pull a stacked block', async () => {
+  it('should sync each repo with its own scope, treat an unreadable scope as none, and refuse to pull a stacked block', async () => {
     const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
     onTestFinished(() => rm(root, { recursive: true, force: true }))
     const home = join(root, 'home')
@@ -110,10 +110,22 @@ describe('blocks', () => {
       }),
     )
     await writeFile(join(lib, 'AGENTS.md'), doc('old'))
+    const broken = join(root, 'projects', 'broken')
+    await mkdir(broken, { recursive: true })
+    await writeFile(join(broken, 'AGENTS.md'), doc('old'))
+    await writeFile(
+      join(broken, '.synapse.json'),
+      JSON.stringify({
+        version: 1,
+        scope: 'bad scope!',
+        syncedFiles: {},
+        fileHashes: {},
+      }),
+    )
     const repos = join(root, 'projects.yaml')
     await writeFile(
       repos,
-      `root: ${join(root, 'projects')}\nrepos:\n  app: null\n  lib: null\n`,
+      `root: ${join(root, 'projects')}\nrepos:\n  app: null\n  lib: null\n  broken: null\n`,
     )
     const run = (...args: string[]) =>
       spawnSync('node', [cliPath, 'blocks', ...args], {
@@ -127,11 +139,14 @@ describe('blocks', () => {
       doc('shared\n\nreact rules'),
     )
     expect(await readFile(join(lib, 'AGENTS.md'), 'utf8')).toBe(doc('shared'))
+    expect(await readFile(join(broken, 'AGENTS.md'), 'utf8')).toBe(
+      doc('shared'),
+    )
     expect(run('check', '--repos', repos).status).toBe(0)
 
     const pull = run('pull', join(app, 'AGENTS.md'))
     expect(pull.status).toBe(1)
-    expect(pull.stderr).toContain('conventions stack scoped parts')
+    expect(pull.stderr).toContain('conventions has scoped parts')
     expect(
       await readFile(join(source, 'blocks', 'conventions.md'), 'utf8'),
     ).toBe('shared\n')

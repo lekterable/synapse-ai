@@ -178,7 +178,7 @@ A scope can add to a block. Put its part in `<sourcePath>/scopes/<scope>/blocks/
   scopes/turborepo/blocks/guides.md appended in repos scoped to turborepo
 ```
 
-A repo without `.synapse.json` or without a scope gets the shared part only. `synapse blocks pull` refuses a block that has scoped parts, because one file's text can't be split back into them; edit those in the source instead.
+A repo without `.synapse.json`, without a scope, or with a scope Synapse can't read gets the shared part only, and a scope folder counts under any spelling of its scope (`web+react` and `react+web` both match `react,web`). `synapse blocks pull` refuses a block that has scoped parts, because one file's text can't be split back into them; edit those in the source instead.
 
 ## Status Symbols
 

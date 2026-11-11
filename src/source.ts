@@ -200,31 +200,33 @@ const getScopeRootPath = (
     : sourceRoot
 }
 
-// Source scope keys contained by the project scope, broadest first.
-export const matchingScopeKeys = (
+export type SourceScope = { key: string; dir: string }
+
+// Source scopes contained by the project scope, broadest first. `key` is the normalized
+// scope and `dir` the folder as named on disk, so a hand-made `scopes/web+react` still counts.
+export const matchingScopes = (
   sourceRoot: string,
   projectScope: string | undefined,
-): string[] => {
+): SourceScope[] => {
   const scopesRoot = resolveWithin(sourceRoot, SCOPES_DIRECTORY)
 
   if (!projectScope || !existsSync(scopesRoot)) {
     return []
   }
 
-  return [
-    ...new Set(
-      readdirSync(scopesRoot, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => normalizeScope(entry.name)),
-    ),
-  ]
-    .filter((scope) => isScopeSubset(scope, projectScope))
-    .sort((leftScope, rightScope) => {
+  return readdirSync(scopesRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      key: normalizeScope(entry.name),
+      dir: join(scopesRoot, entry.name),
+    }))
+    .filter(({ key }) => isScopeSubset(key, projectScope))
+    .sort((left, right) => {
       const specificity =
-        parseScopeParts(leftScope).length - parseScopeParts(rightScope).length
+        parseScopeParts(left.key).length - parseScopeParts(right.key).length
 
       return specificity === 0
-        ? leftScope.localeCompare(rightScope)
+        ? left.key.localeCompare(right.key) || left.dir.localeCompare(right.dir)
         : specificity
     })
 }
@@ -236,28 +238,23 @@ export const resolveEffectiveSourceFile = async (
 ): Promise<SourceFileLocation | undefined> => {
   const normalizedPath = assertAllowedSourceRelativePath(relativeFilePath)
 
-  const scopeKeys = matchingScopeKeys(sourceRoot, scope)
-  const scopedSourceFile = await [...scopeKeys]
+  const scopedSourceFile = await matchingScopes(sourceRoot, scope)
     .reverse()
     .reduce<Promise<SourceFileLocation | undefined>>(
-      async (matchedFilePromise, scopeKey) => {
+      async (matchedFilePromise, { key, dir }) => {
         const matchedFile = await matchedFilePromise
 
         if (matchedFile) {
           return matchedFile
         }
 
-        const scopedPath = resolveScopedSourcePath(
-          sourceRoot,
-          scopeKey,
-          normalizedPath,
-        )
+        const scopedPath = resolveWithin(dir, normalizedPath)
 
         return (await pathExists(scopedPath))
           ? {
               file: normalizedPath,
               path: scopedPath,
-              scope: scopeKey,
+              scope: key,
             }
           : undefined
       },
@@ -290,24 +287,19 @@ export const listEffectiveSourceFiles = async (
       ] as const,
   )
 
-  const scopeKeys = matchingScopeKeys(sourceRoot, scope)
   const scopedEntries = (
     await Promise.all(
-      scopeKeys.map(async (scopeKey) =>
+      matchingScopes(sourceRoot, scope).map(async ({ key, dir }) =>
         (
-          await listSourceFiles(
-            resolveWithin(sourceRoot, join(SCOPES_DIRECTORY, scopeKey)),
-            undefined,
-            true,
-          )
+          await listSourceFiles(dir, undefined, true)
         ).map(
           (file) =>
             [
               file,
               {
                 file,
-                path: resolveScopedSourcePath(sourceRoot, scopeKey, file),
-                scope: scopeKey,
+                path: resolveWithin(dir, file),
+                scope: key,
               },
             ] as const,
         ),
