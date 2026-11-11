@@ -38,8 +38,8 @@ const cli = meow(
 	  --yes, -y               Skip confirmation prompt in sync
 	  --strategy, -s <mode>   Conflict strategy: ask | theirs | ours | skip
 	  --root, -r <path>       Operate on a specific synapse project root
-	  --scope <name[,name]>   Set or target source scopes
-	  --shared                Write added files to the shared source root
+	  --scope <name[,name]>   init: set the project scope; add, remove: target a scope
+	  --shared                add, remove: target the shared source root
 	  --repos <file>          blocks: repos from a projects.yaml-style list
 
 	Examples
@@ -108,6 +108,24 @@ const parseCliFlags = (flags: Record<string, unknown>): CliFlags => {
   }
 }
 
+type ScopeFlag = 'scope' | 'shared'
+
+// Commands that read --scope or --shared; the rest take the scope from .synapse.json.
+const flagCommands: Record<ScopeFlag, string[]> = {
+  scope: ['init', 'add', 'remove'],
+  shared: ['add', 'remove'],
+}
+
+const unusedScopeFlag = (
+  command: string,
+  flags: CliFlags,
+): ScopeFlag | undefined =>
+  (['scope', 'shared'] as const).find(
+    (flag) =>
+      (flag === 'scope' ? flags.scope !== undefined : flags.shared) &&
+      !flagCommands[flag].includes(command),
+  )
+
 const handleCommand = async (): Promise<void> => {
   const parsedFlags = parseCliFlags(cli.flags)
 
@@ -135,6 +153,17 @@ const handleCommand = async (): Promise<void> => {
       problem: `Unknown command: ${command}`,
       reason: 'The command is not recognized by synapse',
       solution: 'Run "synapse --help" to see available commands',
+    })
+    return
+  }
+
+  const unusedFlag = unusedScopeFlag(command, parsedFlags)
+  if (unusedFlag) {
+    showError({
+      problem: `${command} does not take --${unusedFlag}`,
+      reason: `--${unusedFlag} only applies to: ${flagCommands[unusedFlag].join(', ')}. Other commands use the scope saved in .synapse.json`,
+      solution:
+        'Change the project scope with "synapse init --scope <name[,name]>", then run the command again',
     })
     return
   }
