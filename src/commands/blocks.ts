@@ -1,34 +1,19 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import chalk from 'chalk'
 import {
+  blockSources,
   blockStates,
   blocksDir,
   findBlocks,
   readReposFile,
   replaceBlocks,
+  repoScope,
+  scopedBlockNames,
 } from '../blocks'
 import { createConfigManager } from '../config'
 import { print } from '../utils/output'
 import type { CliFlags, CommandHandler } from './types'
-
-const readSources = (dir: string): Record<string, string> =>
-  existsSync(dir)
-    ? Object.fromEntries(
-        readdirSync(dir)
-          .filter((file) => file.endsWith('.md'))
-          .map((file) => [
-            file.slice(0, -3),
-            readFileSync(join(dir, file), 'utf8'),
-          ]),
-      )
-    : {}
 
 // --repos <projects.yaml> lists the repos; otherwise the registered synapse projects.
 const reposFor = (flags: CliFlags): string[] =>
@@ -38,9 +23,20 @@ const reposFor = (flags: CliFlags): string[] =>
 
 const display = (file: string): string => relative(process.cwd(), file) || file
 
+// Each repo's block sources, from its own scope.
+const sourcesByRepo = (
+  repos: string[],
+): ((repo: string) => Record<string, string>) => {
+  const sourcePath = createConfigManager().getSourcePath()
+  const sources = new Map(
+    repos.map((repo) => [repo, blockSources(sourcePath, repoScope(repo))]),
+  )
+  return (repo) => sources.get(repo) ?? {}
+}
+
 const check = (flags: CliFlags): void => {
-  const sources = readSources(blocksDir(createConfigManager().getSourcePath()))
-  const states = blockStates(reposFor(flags), sources)
+  const repos = reposFor(flags)
+  const states = blockStates(repos, sourcesByRepo(repos))
   const drifted = states.filter((state) => state.state === 'drifted')
   const unknown = states.filter((state) => state.state === 'no-source')
   drifted.forEach((state) =>
@@ -57,17 +53,21 @@ const check = (flags: CliFlags): void => {
 }
 
 const sync = (flags: CliFlags): void => {
-  const sources = readSources(blocksDir(createConfigManager().getSourcePath()))
+  const repos = reposFor(flags)
+  const sourcesFor = sourcesByRepo(repos)
   const files = [
-    ...new Set(
-      blockStates(reposFor(flags), sources)
+    ...new Map(
+      blockStates(repos, sourcesFor)
         .filter((state) => state.state === 'drifted')
-        .map((state) => state.file),
+        .map((state) => [state.file, state.repo] as const),
     ),
   ]
-  files.forEach((file) => {
+  files.forEach(([file, repo]) => {
     if (!flags.dryRun)
-      writeFileSync(file, replaceBlocks(readFileSync(file, 'utf8'), sources))
+      writeFileSync(
+        file,
+        replaceBlocks(readFileSync(file, 'utf8'), sourcesFor(repo)),
+      )
     print(`${flags.dryRun ? 'would update' : 'updated'}  ${display(file)}`)
   })
   if (files.length === 0) print('Every block is in sync')
@@ -78,7 +78,14 @@ const pull = (file: string | undefined, flags: CliFlags): void => {
   if (!file) throw new Error('Usage: synapse blocks pull <file>')
   const blocks = findBlocks(readFileSync(resolve(file), 'utf8'))
   if (blocks.length === 0) throw new Error(`${file} has no synapse blocks`)
-  const dir = blocksDir(createConfigManager().getSourcePath())
+  const sourcePath = createConfigManager().getSourcePath()
+  const scoped = scopedBlockNames(sourcePath)
+  const stacked = blocks.filter(({ name }) => scoped.includes(name))
+  if (stacked.length > 0)
+    throw new Error(
+      `${stacked.map(({ name }) => name).join(', ')} stack scoped parts, so edit them in ${sourcePath} instead`,
+    )
+  const dir = blocksDir(sourcePath)
   if (!flags.dryRun) mkdirSync(dir, { recursive: true })
   blocks.forEach(({ name, content }) => {
     if (!flags.dryRun) writeFileSync(join(dir, `${name}.md`), `${content}\n`)

@@ -167,6 +167,19 @@ synapse blocks sync --repos ~/.config/projects.yaml
 
 `--repos` takes a YAML list with a `root` folder and `repos` keyed by folder name under it. Without it, blocks covers the registered synapse projects.
 
+### Scoped blocks
+
+A scope can add to a block. Put its part in `<sourcePath>/scopes/<scope>/blocks/<name>.md`, and a repo whose `.synapse.json` scope contains that scope (set with `synapse init --scope`) gets the shared part followed by each matching scoped part, broadest scope first, separated by a blank line. Unlike scoped files, scoped blocks stack instead of overriding, so one block can collect what every scope of a repo adds:
+
+```text
+~/.synapse/source/
+  blocks/guides.md                  every repo
+  scopes/react/blocks/guides.md     appended in repos scoped to react
+  scopes/turborepo/blocks/guides.md appended in repos scoped to turborepo
+```
+
+A repo without `.synapse.json` or without a scope gets the shared part only. `synapse blocks pull` refuses a block that has scoped parts, because one file's text can't be split back into them; edit those in the source instead.
+
 ## Status Symbols
 
 | Symbol | Meaning                     |

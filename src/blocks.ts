@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
-import { BLOCKS_DIRECTORY } from './source'
+import { createConfigManager } from './config'
+import { BLOCKS_DIRECTORY, matchingScopeKeys, SCOPES_DIRECTORY } from './source'
 
 // A block is a marked region inside a file that otherwise belongs to the repo, like the
 // shared "Code conventions" section of every CLAUDE.md:
@@ -11,8 +12,11 @@ import { BLOCKS_DIRECTORY } from './source'
 //   ...
 //   <!-- /synapse:code-conventions -->
 //
-// Its canonical text lives in <sourcePath>/blocks/<name>.md. Only files that carry the
-// markers are touched, so a repo opts in by adding them.
+// Its canonical text lives in <sourcePath>/blocks/<name>.md, plus
+// <sourcePath>/scopes/<scope>/blocks/<name>.md for repos whose .synapse.json scope contains
+// that scope. The parts stack, shared first and broadest scope next, so one block can list
+// what each scope adds. Only files that carry the markers are touched, so a repo opts in by
+// adding them.
 
 export const BLOCK_FILES = [
   'AGENTS.md',
@@ -47,6 +51,57 @@ export const replaceBlocks = (
 export const blocksDir = (sourcePath: string): string =>
   join(sourcePath, BLOCKS_DIRECTORY)
 
+const readBlockFiles = (dir: string): [string, string][] =>
+  existsSync(dir)
+    ? readdirSync(dir)
+        .filter((file) => file.endsWith('.md'))
+        .map((file) => [
+          file.slice(0, -3),
+          readFileSync(join(dir, file), 'utf8').trim(),
+        ])
+    : []
+
+// The block sources a repo with this scope gets: each name's shared and scoped parts, joined.
+export const blockSources = (
+  sourcePath: string,
+  scope: string | undefined,
+): Record<string, string> =>
+  [
+    blocksDir(sourcePath),
+    ...matchingScopeKeys(sourcePath, scope).map((key) =>
+      join(sourcePath, SCOPES_DIRECTORY, key, BLOCKS_DIRECTORY),
+    ),
+  ]
+    .flatMap(readBlockFiles)
+    .reduce<Record<string, string>>(
+      (sources, [name, text]) => ({
+        ...sources,
+        [name]:
+          sources[name] === undefined ? text : `${sources[name]}\n\n${text}`,
+      }),
+      {},
+    )
+
+// Names of the blocks that some scope adds to, which `blocks pull` can't write back as one file.
+export const scopedBlockNames = (sourcePath: string): string[] => {
+  const scopesRoot = join(sourcePath, SCOPES_DIRECTORY)
+  return existsSync(scopesRoot)
+    ? [
+        ...new Set(
+          readdirSync(scopesRoot).flatMap((scope) =>
+            readBlockFiles(join(scopesRoot, scope, BLOCKS_DIRECTORY)).map(
+              ([name]) => name,
+            ),
+          ),
+        ),
+      ]
+    : []
+}
+
+// The scope in a repo's .synapse.json; undefined when it has none or no .synapse.json.
+export const repoScope = (repo: string): string | undefined =>
+  createConfigManager(repo).getProjectMetadata().scope
+
 const expandHome = (path: string): string =>
   path === '~' || path.startsWith('~/') ? join(homedir(), path.slice(1)) : path
 
@@ -68,13 +123,14 @@ export type BlockState = {
   state: 'in-sync' | 'drifted' | 'no-source'
 }
 
-// Every marked block in the instruction files of these repos, compared with its source.
+// Every marked block in the instruction files of these repos, compared with that repo's source.
 export const blockStates = (
   repos: string[],
-  sources: Record<string, string>,
+  sourcesFor: (repo: string) => Record<string, string>,
 ): BlockState[] =>
-  repos.flatMap((repo) =>
-    BLOCK_FILES.map((file) => join(repo, file))
+  repos.flatMap((repo) => {
+    const sources = sourcesFor(repo)
+    return BLOCK_FILES.map((file) => join(repo, file))
       .filter((path) => existsSync(path))
       .flatMap((path) =>
         findBlocks(readFileSync(path, 'utf8')).map(({ name, content }) => {
@@ -91,5 +147,5 @@ export const blockStates = (
                   : ('drifted' as const),
           }
         }),
-      ),
-  )
+      )
+  })

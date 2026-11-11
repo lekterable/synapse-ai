@@ -1,3 +1,4 @@
+import { existsSync, readdirSync } from 'node:fs'
 import { readdir, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -199,24 +200,20 @@ const getScopeRootPath = (
     : sourceRoot
 }
 
-const listMatchingScopeKeys = async (
+// Source scope keys contained by the project scope, broadest first.
+export const matchingScopeKeys = (
   sourceRoot: string,
   projectScope: string | undefined,
-): Promise<string[]> => {
-  if (!projectScope) {
-    return []
-  }
-
+): string[] => {
   const scopesRoot = resolveWithin(sourceRoot, SCOPES_DIRECTORY)
 
-  if (!(await pathExists(scopesRoot))) {
+  if (!projectScope || !existsSync(scopesRoot)) {
     return []
   }
 
-  const entries = await readdir(scopesRoot, { withFileTypes: true })
   return [
     ...new Set(
-      entries
+      readdirSync(scopesRoot, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .map((entry) => normalizeScope(entry.name)),
     ),
@@ -239,8 +236,8 @@ export const resolveEffectiveSourceFile = async (
 ): Promise<SourceFileLocation | undefined> => {
   const normalizedPath = assertAllowedSourceRelativePath(relativeFilePath)
 
-  const matchingScopeKeys = await listMatchingScopeKeys(sourceRoot, scope)
-  const scopedSourceFile = await [...matchingScopeKeys]
+  const scopeKeys = matchingScopeKeys(sourceRoot, scope)
+  const scopedSourceFile = await [...scopeKeys]
     .reverse()
     .reduce<Promise<SourceFileLocation | undefined>>(
       async (matchedFilePromise, scopeKey) => {
@@ -293,10 +290,10 @@ export const listEffectiveSourceFiles = async (
       ] as const,
   )
 
-  const matchingScopeKeys = await listMatchingScopeKeys(sourceRoot, scope)
+  const scopeKeys = matchingScopeKeys(sourceRoot, scope)
   const scopedEntries = (
     await Promise.all(
-      matchingScopeKeys.map(async (scopeKey) =>
+      scopeKeys.map(async (scopeKey) =>
         (
           await listSourceFiles(
             resolveWithin(sourceRoot, join(SCOPES_DIRECTORY, scopeKey)),
