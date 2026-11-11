@@ -1,5 +1,15 @@
 import { createHash } from 'node:crypto'
-import { copyFile, mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rename,
+  rm,
+  symlink,
+} from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { move } from 'fs-extra'
 import { minimatch } from 'minimatch'
@@ -55,6 +65,17 @@ const ensureDirectory = async (filePath: string): Promise<void> => {
   await mkdir(dir, { recursive: true })
 }
 
+// Where a symlink points, or undefined for anything else. Synapse syncs a link as a link.
+export const linkTarget = async (path: string): Promise<string | undefined> =>
+  (await lstat(path)).isSymbolicLink() ? readlink(path) : undefined
+
+// Like pathExists, but true for a link whose target is missing too.
+export const entryExists = async (path: string): Promise<boolean> =>
+  lstat(path).then(
+    () => true,
+    () => false,
+  )
+
 export const copyFileAtomic = async (
   src: string,
   dest: string,
@@ -63,8 +84,15 @@ export const copyFileAtomic = async (
   const tmpPath = `${dest}.tmp`
 
   try {
-    await copyFile(src, tmpPath)
-    await move(tmpPath, dest, { overwrite: true })
+    const target = await linkTarget(src)
+    if (target === undefined) {
+      await copyFile(src, tmpPath)
+      await move(tmpPath, dest, { overwrite: true })
+    } else {
+      await rm(tmpPath, { force: true })
+      await symlink(target, tmpPath)
+      await rename(tmpPath, dest)
+    }
   } catch (error) {
     await rm(tmpPath, { force: true }).catch(() => undefined)
     throw error
@@ -81,12 +109,17 @@ export const backupFile = async (
   const fileName = basename(filePath)
   const backupPath = join(backupDir, `${timestamp}-${fileName}`)
 
-  await copyFile(filePath, backupPath)
+  const target = await linkTarget(filePath)
+  await (target === undefined
+    ? copyFile(filePath, backupPath)
+    : symlink(target, backupPath))
   return backupPath
 }
 
 export const getFileHash = async (filePath: string): Promise<string> => {
-  const content = await readFile(filePath)
+  const target = await linkTarget(filePath)
+  const content =
+    target === undefined ? await readFile(filePath) : `symlink:${target}`
   return createHash('sha256').update(content).digest('hex')
 }
 

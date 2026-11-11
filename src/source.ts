@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs'
-import { readdir, rm, stat } from 'node:fs/promises'
+import { readdir, readlink, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path'
 import { mkdirp, pathExists } from 'fs-extra'
 import type { ConfigManager } from './config'
 import { normalizeRelativePath, resolveWithin } from './utils/paths'
@@ -51,6 +51,31 @@ const createDirectories = async (basePath: string): Promise<void> => {
   ])
 }
 
+// A link syncs only when it is relative and stays inside the folder it is synced from,
+// so it points at the same file in every project.
+const isContainedLink = async (
+  absolutePath: string,
+  relativePath: string,
+): Promise<boolean> => {
+  const target = await readlink(absolutePath)
+  const resolved = normalizeRelativePath(
+    posix.join(posix.dirname(relativePath), target.split('\\').join('/')),
+  )
+  const contained =
+    !isAbsolute(target) &&
+    resolved !== '' &&
+    resolved !== '..' &&
+    !resolved.startsWith('../')
+
+  if (!contained) {
+    console.warn(
+      `Skipping ${relativePath}: a synced symlink must be relative and point inside the source folder`,
+    )
+  }
+
+  return contained
+}
+
 const listSourceFiles = async (
   rootDir: string,
   currentDir: string = rootDir,
@@ -76,13 +101,20 @@ const listSourceFiles = async (
         return listSourceFiles(rootDir, absolutePath)
       }
 
+      const relativePath = normalizeRelativePath(
+        relative(rootDir, absolutePath),
+      )
+
+      if (entry.isSymbolicLink()) {
+        return (await isContainedLink(absolutePath, relativePath))
+          ? [relativePath]
+          : []
+      }
+
       if (!entry.isFile()) {
         return []
       }
 
-      const relativePath = normalizeRelativePath(
-        relative(rootDir, absolutePath),
-      )
       return relativePath ? [relativePath] : []
     }),
   )

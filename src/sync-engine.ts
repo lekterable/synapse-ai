@@ -1,10 +1,11 @@
-import { stat } from 'node:fs/promises'
+import { lstat, stat } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathExists } from 'fs-extra'
 import type { ConfigManager } from './config'
 import {
   backupFile,
   copyFileAtomic,
+  entryExists,
   getFileHash,
   isIgnored,
   listDirectoryFiles,
@@ -107,7 +108,7 @@ const buildSyncPlanItem = async (
   const sourceFile = await resolveEffectiveSourceFile(sourceRoot, file, scope)
   const sourceFilePath =
     sourceFile?.path ?? resolveSharedSourcePath(sourceRoot, file)
-  const projectExists = await pathExists(projectFilePath)
+  const projectExists = await entryExists(projectFilePath)
 
   if (!sourceFile) {
     return {
@@ -257,7 +258,7 @@ const applySyncPlanItem = async (
     }
 
     const hash = await getFileHash(item.projectFilePath)
-    const stats = await stat(item.projectFilePath)
+    const stats = await lstat(item.projectFilePath)
 
     return {
       count: accumulator.count + 1,
@@ -439,7 +440,7 @@ export const detectConflicts = async (
           return undefined
         }
 
-        const projectExists = await pathExists(projectFilePath)
+        const projectExists = await entryExists(projectFilePath)
         const lastSync = getMetadataEntry(metadata.syncedFiles, file)
 
         if (!projectExists) {
