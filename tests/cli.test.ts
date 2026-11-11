@@ -1116,6 +1116,37 @@ describe('synapse', () => {
         fix: 'Use one of: ask, theirs, ours, skip',
       })
     })
+    it.each([
+      [
+        ['sync', '--scope', 'react'],
+        'scope',
+        'init, add, remove',
+        'Change the project scope with "synapse init --scope <name[,name]>", then run the command again',
+      ],
+      [
+        ['status', '--scope', 'react'],
+        'scope',
+        'init, add, remove',
+        'Change the project scope with "synapse init --scope <name[,name]>", then run the command again',
+      ],
+      [
+        ['init', '--shared'],
+        'shared',
+        'add, remove',
+        'Run the command again without --shared',
+      ],
+    ])(
+      'should reject %j because that command ignores the flag',
+      (args, flag, commands, fix) => {
+        const result = runCli(sandbox.scratch, sandbox.home, args)
+
+        expectError(result, {
+          problem: `${args[0]} does not take --${flag}`,
+          reason: `--${flag} only applies to: ${commands}. Other commands use the scope saved in .synapse.json`,
+          fix,
+        })
+      },
+    )
   })
 
   describe('list', () => {
