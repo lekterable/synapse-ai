@@ -5,7 +5,7 @@ import { parse } from 'yaml'
 import { createConfigManager } from './config'
 import {
   BLOCKS_DIRECTORY,
-  matchingScopes,
+  matchingScopeKeys,
   SCOPES_DIRECTORY,
   validateScopeName,
 } from './source'
@@ -73,8 +73,8 @@ export const blockSources = (
 ): Record<string, string> =>
   [
     blocksDir(sourcePath),
-    ...matchingScopes(sourcePath, scope).map(({ dir }) =>
-      join(dir, BLOCKS_DIRECTORY),
+    ...matchingScopeKeys(sourcePath, scope).map((key) =>
+      join(sourcePath, SCOPES_DIRECTORY, key, BLOCKS_DIRECTORY),
     ),
   ]
     .flatMap(readBlockFiles)

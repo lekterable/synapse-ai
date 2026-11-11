@@ -71,7 +71,7 @@ describe('blocks', () => {
       await writeFile(join(source, path), text)
     }
     await part('blocks/guides.md', 'shared\n')
-    await part('scopes/web+react/blocks/guides.md', 'react web\n')
+    await part('scopes/react+web/blocks/guides.md', 'react web\n')
     await part('scopes/react/blocks/guides.md', 'react\n')
     await part('scopes/mobile/blocks/guides.md', 'mobile\n')
     await part('scopes/react/blocks/only-react.md', 'only react\n')
