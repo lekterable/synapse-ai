@@ -1,3 +1,14 @@
+# 1.8.0
+
+## Features
+
+- sync relative symlinks in the source as symlinks (#13) 75db1eb1
+- let a scope add to a shared block (#12) c6013e10
+
+## Fixes
+
+- reject --scope and --shared where they do nothing (#11) a7de1572
+
 # 1.7.0
 
 ## Features
