@@ -163,7 +163,9 @@ const handleCommand = async (): Promise<void> => {
       problem: `${command} does not take --${unusedFlag}`,
       reason: `--${unusedFlag} only applies to: ${flagCommands[unusedFlag].join(', ')}. Other commands use the scope saved in .synapse.json`,
       solution:
-        'Change the project scope with "synapse init --scope <name[,name]>", then run the command again',
+        unusedFlag === 'scope'
+          ? 'Change the project scope with "synapse init --scope <name[,name]>", then run the command again'
+          : 'Run the command again without --shared',
     })
     return
   }
