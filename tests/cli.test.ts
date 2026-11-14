@@ -1166,6 +1166,9 @@ describe('synapse', () => {
 
     it('should show last sync dates for active projects', async () => {
       const { scopedFile, sharedFile } = await initializeScopedProjects(sandbox)
+      // The sync can run on one side of UTC midnight and the check on the other.
+      const today = () => new Date().toISOString().slice(0, 10)
+      const before = today()
 
       expect(
         runCli(sandbox.repo, sandbox.home, [
@@ -1181,7 +1184,8 @@ describe('synapse', () => {
 
       expect(result.status).toBe(0)
       expect(stdout).toContain('Last Sync')
-      expect(stdout).toContain(new Date().toISOString().slice(0, 10))
+      const after = today()
+      expect(stdout).toMatch(new RegExp(`${before}|${after}`))
       expect(stdout).toContain('never')
       expect(stdout).toContain(sandbox.webConsumer)
       expect(
