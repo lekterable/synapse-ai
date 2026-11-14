@@ -1185,7 +1185,7 @@ describe('synapse', () => {
       expect(result.status).toBe(0)
       expect(stdout).toContain('Last Sync')
       const after = today()
-      expect([before, after].some((day) => stdout.includes(day))).toBe(true)
+      expect(stdout).toMatch(new RegExp(`${before}|${after}`))
       expect(stdout).toContain('never')
       expect(stdout).toContain(sandbox.webConsumer)
       expect(
