@@ -12,7 +12,8 @@ export default defineConfig({
   external: ['ink', 'react'],
   noExternal: [],
   clean: true,
-  splitting: false,
+  // A separate chunk for ./utils/ink, so Ink loads only when a command renders with it.
+  splitting: true,
   sourcemap: false,
   minify: false,
   treeshake: true,

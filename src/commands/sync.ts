@@ -1,6 +1,5 @@
 import { homedir } from 'node:os'
 import chalk from 'chalk'
-import { Box, render, Text } from 'ink'
 import {
   getCommandFileBasePath,
   getMissingProjectErrorDetails,
@@ -25,7 +24,6 @@ import {
   type SyncPlanItem,
   type SyncPlanReason,
 } from '../sync-engine'
-import { confirm } from '../utils/confirm'
 import { diffFiles } from '../utils/diff'
 import { print, showError, showSuccess, showWarning } from '../utils/output'
 import { toProjectRelativePath } from '../utils/paths'
@@ -33,6 +31,7 @@ import {
   ensureProjectOwnsPath,
   NestedProjectOwnershipError,
 } from '../utils/project-root'
+import { confirm, renderLines } from '../utils/ui'
 import type { CommandHandler } from './types'
 
 const CONFLICT_STRATEGIES: ConflictStrategy[] = [
@@ -565,23 +564,18 @@ const statusHandler: CommandHandler = async (input, flags) => {
   const padding = maxFileLength + 2
   const separatorLength = padding + 20
 
-  render(
-    <Box flexDirection="column">
-      <Text>
-        {chalk.bold('File'.padEnd(padding))}Status{chalk.bold('  Last Sync')}
-      </Text>
-      <Text>{'-'.repeat(separatorLength)}</Text>
-      {statuses.map((status) => (
-        <Text key={status.file}>
-          {status.file.padEnd(padding)}
-          {formatStatus(status.status)}
-          {status.lastSync
+  await renderLines([
+    `${chalk.bold('File'.padEnd(padding))}Status${chalk.bold('  Last Sync')}`,
+    '-'.repeat(separatorLength),
+    ...statuses.map(
+      (status) =>
+        `${status.file.padEnd(padding)}${formatStatus(status.status)}${
+          status.lastSync
             ? `  ${new Date(status.lastSync).toLocaleDateString()}`
-            : '  Never'}
-        </Text>
-      ))}
-    </Box>,
-  )
+            : '  Never'
+        }`,
+    ),
+  ])
 }
 
 const diffHandler: CommandHandler = async (input, flags) => {
@@ -664,19 +658,13 @@ const diffHandler: CommandHandler = async (input, flags) => {
   ) {
     showWarning(diff)
   } else {
-    render(
-      <Box flexDirection="column">
-        <Text>{chalk.bold(`Diff: ${relativePath}`)}</Text>
-        <Text>
-          {chalk.dim(`--- Source: ${formatDisplayPath(sourceFile.path)}`)}
-        </Text>
-        <Text>
-          {chalk.dim(`+++ Project: ${formatDisplayPath(projectFilePath)}`)}
-        </Text>
-        <Text></Text>
-        <Text>{diff}</Text>
-      </Box>,
-    )
+    await renderLines([
+      chalk.bold(`Diff: ${relativePath}`),
+      chalk.dim(`--- Source: ${formatDisplayPath(sourceFile.path)}`),
+      chalk.dim(`+++ Project: ${formatDisplayPath(projectFilePath)}`),
+      '',
+      diff,
+    ])
   }
 }
 

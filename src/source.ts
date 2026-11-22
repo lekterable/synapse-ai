@@ -52,8 +52,9 @@ const createDirectories = async (basePath: string): Promise<void> => {
 }
 
 // A link syncs only when it is relative, stays inside the layer it is synced from and points at
-// something that layer syncs too, so it resolves to the same file in every project.
-const isSyncableLink = async (
+// something that layer syncs too, so it resolves to the same file in every project. A link to
+// another link syncs only when that link would sync too, or it would dangle in the project.
+const linkStaysInLayer = async (
   absolutePath: string,
   relativePath: string,
   skipReservedAtRoot: boolean,
@@ -62,13 +63,35 @@ const isSyncableLink = async (
   const resolved = normalizeRelativePath(
     posix.join(posix.dirname(relativePath), target.split('\\').join('/')),
   )
-  const syncable =
+  const inLayer =
     !isAbsolute(target) &&
     resolved !== '' &&
     resolved !== '..' &&
     !resolved.startsWith('../') &&
     !(skipReservedAtRoot && isReservedSourceRelativePath(resolved)) &&
     (await pathExists(absolutePath))
+
+  if (!inLayer) {
+    return false
+  }
+
+  const targetPath = resolve(dirname(absolutePath), target)
+  const targetStats = await lstat(targetPath)
+  return targetStats.isSymbolicLink()
+    ? linkStaysInLayer(targetPath, resolved, skipReservedAtRoot)
+    : true
+}
+
+const isSyncableLink = async (
+  absolutePath: string,
+  relativePath: string,
+  skipReservedAtRoot: boolean,
+): Promise<boolean> => {
+  const syncable = await linkStaysInLayer(
+    absolutePath,
+    relativePath,
+    skipReservedAtRoot,
+  )
 
   if (!syncable) {
     console.warn(

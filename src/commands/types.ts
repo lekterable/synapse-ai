@@ -8,6 +8,7 @@ export type CliFlags = {
   scope?: string
   shared: boolean
   repos?: string
+  json: boolean
 }
 
 export type CommandHandler = (

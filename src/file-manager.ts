@@ -109,6 +109,7 @@ export const getEntryHash = async (path: string): Promise<string> => {
 }
 
 // A synced link never replaces a real directory: that could hold the project's own files.
+// Sync checks this before the backup, so copyLinkAtomic does not check it again.
 export const assertNoDirectory = async (path: string): Promise<void> => {
   const existing = await lstat(path).catch(() => undefined)
   if (existing?.isDirectory()) {
@@ -122,7 +123,6 @@ export const copyLinkAtomic = async (
   src: string,
   dest: string,
 ): Promise<void> => {
-  await assertNoDirectory(dest)
   await ensureDirectory(dest)
   const tmpPath = `${dest}.tmp`
 

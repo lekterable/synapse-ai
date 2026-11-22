@@ -66,42 +66,70 @@ const readBlockFiles = (dir: string): [string, string][] =>
         ])
     : []
 
+const joinParts = (dirs: string[]): Record<string, string> =>
+  dirs.flatMap(readBlockFiles).reduce<Record<string, string>>(
+    (sources, [name, text]) => ({
+      ...sources,
+      [name]: [sources[name], text]
+        .filter((part) => part !== undefined && part !== '')
+        .join('\n\n'),
+    }),
+    {},
+  )
+
+const scopedDirs = (sourcePath: string, scope: string | undefined): string[] =>
+  matchingScopeKeys(sourcePath, scope).map((key) =>
+    join(sourcePath, SCOPES_DIRECTORY, key, BLOCKS_DIRECTORY),
+  )
+
 // The block sources a repo with this scope gets: each name's shared and scoped parts, joined.
 export const blockSources = (
   sourcePath: string,
   scope: string | undefined,
 ): Record<string, string> =>
-  [
-    blocksDir(sourcePath),
-    ...matchingScopeKeys(sourcePath, scope).map((key) =>
-      join(sourcePath, SCOPES_DIRECTORY, key, BLOCKS_DIRECTORY),
-    ),
-  ]
-    .flatMap(readBlockFiles)
-    .reduce<Record<string, string>>(
-      (sources, [name, text]) => ({
-        ...sources,
-        [name]: [sources[name], text]
-          .filter((part) => part !== undefined && part !== '')
-          .join('\n\n'),
-      }),
-      {},
-    )
+  joinParts([blocksDir(sourcePath), ...scopedDirs(sourcePath, scope)])
 
-// Names of the blocks that some scope adds to, which `blocks pull` can't write back as one file.
-export const scopedBlockNames = (sourcePath: string): string[] => {
+// Only the scoped parts a repo with this scope adds, joined the same way. A name whose parts
+// are all empty adds nothing, so it is left out.
+export const scopedBlockSources = (
+  sourcePath: string,
+  scope: string | undefined,
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(joinParts(scopedDirs(sourcePath, scope))).filter(
+      ([, text]) => text !== '',
+    ),
+  )
+
+// Every block name the source has, shared or added by any scope.
+export const blockNames = (sourcePath: string): string[] => {
   const scopesRoot = join(sourcePath, SCOPES_DIRECTORY)
-  return existsSync(scopesRoot)
-    ? [
-        ...new Set(
-          readdirSync(scopesRoot).flatMap((scope) =>
-            readBlockFiles(join(scopesRoot, scope, BLOCKS_DIRECTORY)).map(
-              ([name]) => name,
-            ),
-          ),
-        ),
+  const scopes = existsSync(scopesRoot) ? readdirSync(scopesRoot) : []
+  return [
+    ...new Set(
+      [
+        blocksDir(sourcePath),
+        ...scopes.map((scope) => join(scopesRoot, scope, BLOCKS_DIRECTORY)),
       ]
-    : []
+        .flatMap(readBlockFiles)
+        .map(([name]) => name),
+    ),
+  ].sort((left, right) => left.localeCompare(right))
+}
+
+// The shared part a pulled block stands for: the block minus the scoped parts this repo adds.
+// Undefined when the block no longer ends with them, so an edit to a scoped part is never
+// written into the shared one.
+export const sharedPart = (
+  content: string,
+  scoped: string | undefined,
+): string | undefined => {
+  if (scoped === undefined) return content
+  if (content === scoped) return ''
+  const suffix = `\n\n${scoped}`
+  return content.endsWith(suffix)
+    ? content.slice(0, -suffix.length).trim()
+    : undefined
 }
 
 // The scope in a repo's .synapse.json; undefined when it has none, no .synapse.json, or a
