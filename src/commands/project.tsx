@@ -3,7 +3,6 @@ import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import chalk from 'chalk'
 import { pathExists } from 'fs-extra'
-import { Box, render, Text } from 'ink'
 import { createConfigManager } from '../config'
 import {
   type DoctorFinding,
@@ -18,8 +17,8 @@ import {
   resolveProjectContext,
 } from '../project-context'
 import { formatScopeForDisplay, validateScopeName } from '../source'
-import { confirm } from '../utils/confirm'
 import { print, showError, showSuccess, showWarning } from '../utils/output'
+import { confirm, renderLines } from '../utils/ui'
 import type { CommandHandler } from './types'
 
 const MIN_COLUMN_WIDTH = 20
@@ -448,29 +447,19 @@ const listHandler: CommandHandler = async (input) => {
   const lastSyncPadding = 14
   const separatorLength = padding + scopePadding + lastSyncPadding + 12
 
-  render(
-    <Box flexDirection="column">
-      <Text>
-        {chalk.bold('Path'.padEnd(padding))}
-        {chalk.bold('Scope'.padEnd(scopePadding))}
-        {chalk.bold('Last Sync'.padEnd(lastSyncPadding))}
-        Status
-      </Text>
-      <Text>{'-'.repeat(separatorLength)}</Text>
-      {projectStatuses.map((project) => (
-        <Text key={project.path}>
-          {project.displayPath.padEnd(padding)}
-          {(project.scope ? formatScopeForDisplay(project.scope) : '-').padEnd(
-            scopePadding,
-          )}
-          {formatLastSync(project.status, project.lastSync).padEnd(
-            lastSyncPadding,
-          )}
-          {formatStatus(project.status)}
-        </Text>
-      ))}
-    </Box>,
-  )
+  await renderLines([
+    `${chalk.bold('Path'.padEnd(padding))}${chalk.bold('Scope'.padEnd(scopePadding))}${chalk.bold('Last Sync'.padEnd(lastSyncPadding))}Status`,
+    '-'.repeat(separatorLength),
+    ...projectStatuses.map(
+      (project) =>
+        `${project.displayPath.padEnd(padding)}${(
+          project.scope ? formatScopeForDisplay(project.scope) : '-'
+        ).padEnd(scopePadding)}${formatLastSync(
+          project.status,
+          project.lastSync,
+        ).padEnd(lastSyncPadding)}${formatStatus(project.status)}`,
+    ),
+  ])
 }
 
 const renderPrunePlan = (entries: ProjectListEntry[]): void => {

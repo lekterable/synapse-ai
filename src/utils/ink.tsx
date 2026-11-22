@@ -2,6 +2,9 @@ import chalk from 'chalk'
 import { Box, render, Text, useInput } from 'ink'
 import { type FC, useRef } from 'react'
 
+// Everything that renders with Ink. Ink and React take most of the CLI's start-up time, so
+// commands load this file through ./ui only when they show a prompt or a view.
+
 type ConfirmPromptProps = {
   message: string
   defaultValue: boolean
@@ -69,4 +72,16 @@ export const confirm = async (
       />,
     )
   })
+}
+
+// Prints lines as one Ink column, so each line wraps to the terminal like the rest of the views.
+export const renderLines = (lines: string[]): void => {
+  render(
+    <Box flexDirection="column">
+      {lines.map((line, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the lines are static
+        <Text key={index}>{line}</Text>
+      ))}
+    </Box>,
+  )
 }
