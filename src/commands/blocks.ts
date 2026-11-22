@@ -79,7 +79,8 @@ const sync = (flags: CliFlags): void => {
 
 // Makes a file's blocks the new source, e.g. after editing them in one repo. A block with
 // scoped parts saves only its shared part, which is the block minus the scoped parts the
-// file's repo adds; it is refused only when those scoped parts were edited too.
+// file's repo adds. It is refused when the block no longer ends with those parts, and a
+// block of only scoped parts is skipped, so an existing shared part is never emptied.
 const pull = (file: string | undefined, flags: CliFlags): void => {
   if (!file) throw new Error('Usage: synapse blocks pull <file>')
   const path = resolve(file)
@@ -98,10 +99,9 @@ const pull = (file: string | undefined, flags: CliFlags): void => {
       `${edited.map(({ name }) => name).join(', ')} ${edited.length === 1 ? 'does' : 'do'} not end with the scoped parts in ${sourcePath}: edit scoped parts there, or run "synapse blocks sync" first if the source changed`,
     )
   const dir = blocksDir(sourcePath)
-  // A block that is only its scoped parts has no shared part to save; writing an empty one
-  // would give every other repo an empty source for it.
+  // Writing an empty shared part would empty the block in every repo outside these scopes.
   const saved = parts.filter(
-    ({ name, shared }) => shared !== '' || existsSync(join(dir, `${name}.md`)),
+    ({ name, shared }) => shared !== '' || scoped[name] === undefined,
   )
   if (!flags.dryRun) mkdirSync(dir, { recursive: true })
   saved.forEach(({ name, shared }) => {
@@ -113,7 +113,7 @@ const pull = (file: string | undefined, flags: CliFlags): void => {
   parts
     .filter((part) => !saved.includes(part))
     .forEach(({ name }) =>
-      print(`kept  ${name}: it has only scoped parts, nothing shared to save`),
+      print(`skipped  ${name}: only scoped parts, nothing shared to save`),
     )
 }
 

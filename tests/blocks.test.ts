@@ -192,45 +192,58 @@ describe('blocks', () => {
     expect(await shared()).toBe('shared v2\n')
   })
 
-  it('should not create a shared part when pulling a block that is only scoped parts', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
-    onTestFinished(() => rm(root, { recursive: true, force: true }))
-    const home = join(root, 'home')
-    const source = join(home, '.synapse', 'source')
-    await mkdir(join(source, 'scopes', 'react', 'blocks'), { recursive: true })
-    await writeFile(
-      join(source, 'scopes', 'react', 'blocks', 'conventions.md'),
-      'react rules\n',
-    )
-    const app = join(root, 'app')
-    await mkdir(app, { recursive: true })
-    await writeFile(
-      join(app, '.synapse.json'),
-      JSON.stringify({
-        version: 1,
-        scope: 'react',
-        syncedFiles: {},
-        fileHashes: {},
-      }),
-    )
-    await writeFile(join(app, 'AGENTS.md'), doc('react rules'))
+  it.each([
+    ['no shared part yet', undefined],
+    ['a shared part', 'shared\n'],
+  ])(
+    'should skip a block of only scoped parts on pull, with %s',
+    async (_, existing) => {
+      const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
+      onTestFinished(() => rm(root, { recursive: true, force: true }))
+      const home = join(root, 'home')
+      const source = join(home, '.synapse', 'source')
+      await mkdir(join(source, 'scopes', 'react', 'blocks'), {
+        recursive: true,
+      })
+      await writeFile(
+        join(source, 'scopes', 'react', 'blocks', 'conventions.md'),
+        'react rules\n',
+      )
+      const sharedFile = join(source, 'blocks', 'conventions.md')
+      if (existing !== undefined) {
+        await mkdir(join(source, 'blocks'), { recursive: true })
+        await writeFile(sharedFile, existing)
+      }
+      const app = join(root, 'app')
+      await mkdir(app, { recursive: true })
+      await writeFile(
+        join(app, '.synapse.json'),
+        JSON.stringify({
+          version: 1,
+          scope: 'react',
+          syncedFiles: {},
+          fileHashes: {},
+        }),
+      )
+      await writeFile(join(app, 'AGENTS.md'), doc('react rules'))
 
-    const pull = spawnSync(
-      'node',
-      [cliPath, 'blocks', 'pull', join(app, 'AGENTS.md')],
-      {
-        cwd: root,
-        encoding: 'utf-8',
-        env: { ...process.env, HOME: home, NO_COLOR: '1' },
-      },
-    )
+      const pull = spawnSync(
+        'node',
+        [cliPath, 'blocks', 'pull', join(app, 'AGENTS.md')],
+        {
+          cwd: root,
+          encoding: 'utf-8',
+          env: { ...process.env, HOME: home, NO_COLOR: '1' },
+        },
+      )
 
-    expect(pull.status).toBe(0)
-    expect(pull.stdout).toContain('kept  conventions')
-    await expect(
-      readFile(join(source, 'blocks', 'conventions.md'), 'utf8'),
-    ).rejects.toThrow()
-  })
+      expect(pull.status).toBe(0)
+      expect(pull.stdout).toContain('skipped  conventions')
+      await (existing === undefined
+        ? expect(readFile(sharedFile, 'utf8')).rejects.toThrow()
+        : expect(readFile(sharedFile, 'utf8')).resolves.toBe(existing))
+    },
+  )
 
   it('should report which repo carries each block, as a table or JSON', async () => {
     const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
