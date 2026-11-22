@@ -1,7 +1,9 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import chalk from 'chalk'
 import {
+  type BlockState,
+  blockNames,
   blockSources,
   blockStates,
   blocksDir,
@@ -9,10 +11,12 @@ import {
   readReposFile,
   replaceBlocks,
   repoScope,
-  scopedBlockNames,
+  scopedBlockSources,
+  sharedPart,
 } from '../blocks'
 import { createConfigManager } from '../config'
 import { print } from '../utils/output'
+import { findNearestProjectRoot } from '../utils/project-root'
 import type { CliFlags, CommandHandler } from './types'
 
 // --repos <projects.yaml> lists the repos; otherwise the registered synapse projects.
@@ -73,26 +77,110 @@ const sync = (flags: CliFlags): void => {
   if (files.length === 0) print('Every block is in sync')
 }
 
-// Makes a file's blocks the new source, e.g. after editing them in one repo.
+// Makes a file's blocks the new source, e.g. after editing them in one repo. A block with
+// scoped parts saves only its shared part, which is the block minus the scoped parts the
+// file's repo adds; it is refused only when those scoped parts were edited too.
 const pull = (file: string | undefined, flags: CliFlags): void => {
   if (!file) throw new Error('Usage: synapse blocks pull <file>')
-  const blocks = findBlocks(readFileSync(resolve(file), 'utf8'))
+  const path = resolve(file)
+  const blocks = findBlocks(readFileSync(path, 'utf8'))
   if (blocks.length === 0) throw new Error(`${file} has no synapse blocks`)
   const sourcePath = createConfigManager().getSourcePath()
-  const scoped = scopedBlockNames(sourcePath)
-  const stacked = blocks.filter(({ name }) => scoped.includes(name))
-  if (stacked.length > 0)
+  const repo = findNearestProjectRoot(dirname(path)) ?? dirname(path)
+  const scoped = scopedBlockSources(sourcePath, repoScope(repo))
+  const parts = blocks.map(({ name, content }) => ({
+    name,
+    shared: sharedPart(content, scoped[name]),
+  }))
+  const edited = parts.filter(({ shared }) => shared === undefined)
+  if (edited.length > 0)
     throw new Error(
-      `${stacked.map(({ name }) => name).join(', ')} ${stacked.length === 1 ? 'has' : 'have'} scoped parts, so edit ${stacked.length === 1 ? 'it' : 'them'} in ${sourcePath} instead`,
+      `${edited.map(({ name }) => name).join(', ')} ${edited.length === 1 ? 'has' : 'have'} edited scoped parts, so edit ${edited.length === 1 ? 'it' : 'them'} in ${sourcePath} instead`,
     )
   const dir = blocksDir(sourcePath)
   if (!flags.dryRun) mkdirSync(dir, { recursive: true })
-  blocks.forEach(({ name, content }) => {
-    if (!flags.dryRun) writeFileSync(join(dir, `${name}.md`), `${content}\n`)
+  parts.forEach(({ name, shared = '' }) => {
+    if (!flags.dryRun) writeFileSync(join(dir, `${name}.md`), `${shared}\n`)
     print(
       `${flags.dryRun ? 'would save' : 'saved'}  ${name} → ${join(dir, `${name}.md`)}`,
     )
   })
+}
+
+type Carried = 'yes' | 'no' | 'drifted' | 'no-source'
+
+// One repo's blocks: drifted when any file has it drifted, yes when every copy is in sync.
+const carried = (states: BlockState[]): Carried =>
+  states.length === 0
+    ? 'no'
+    : states.some((state) => state.state === 'drifted')
+      ? 'drifted'
+      : states.some((state) => state.state === 'no-source')
+        ? 'no-source'
+        : 'yes'
+
+const paint: Record<Carried, (text: string) => string> = {
+  yes: chalk.green,
+  no: chalk.dim,
+  drifted: chalk.yellow,
+  'no-source': chalk.dim,
+}
+
+// Which repo carries which block, read only: a table, or with --json the same data.
+const report = (flags: CliFlags): void => {
+  const repos = reposFor(flags)
+  const names = blockNames(createConfigManager().getSourcePath())
+  const states = blockStates(repos, sourcesByRepo(repos))
+  const rows = repos.map((repo) => ({
+    repo,
+    missing: !existsSync(repo),
+    blocks: Object.fromEntries(
+      names.map((name) => [
+        name,
+        carried(
+          states.filter((state) => state.repo === repo && state.name === name),
+        ),
+      ]),
+    ),
+  }))
+  if (flags.json) {
+    print(JSON.stringify({ blocks: names, repos: rows }, undefined, 2))
+    return
+  }
+  if (rows.length === 0 || names.length === 0) {
+    print(
+      rows.length === 0 ? 'No repos to report on' : 'The source has no blocks',
+    )
+    return
+  }
+  const labels = rows.map(
+    ({ repo, missing }) => `${display(repo)}${missing ? ' (missing)' : ''}`,
+  )
+  const width = Math.max(4, ...labels.map((label) => label.length)) + 2
+  const widths = names.map((name) => Math.max(name.length, 9) + 2)
+  print(
+    chalk.bold(
+      [
+        'Repo'.padEnd(width),
+        ...names.map((name, index) => name.padEnd(widths[index] ?? 0)),
+      ]
+        .join('')
+        .trimEnd(),
+    ),
+  )
+  rows.forEach(({ blocks }, row) =>
+    print(
+      [
+        (labels[row] ?? '').padEnd(width),
+        ...names.map((name, index) => {
+          const state = blocks[name] ?? 'no'
+          return paint[state](state.padEnd(widths[index] ?? 0))
+        }),
+      ]
+        .join('')
+        .trimEnd(),
+    ),
+  )
 }
 
 const blocks: CommandHandler = (input, flags) => {
@@ -100,7 +188,10 @@ const blocks: CommandHandler = (input, flags) => {
   if (action === 'check') return check(flags)
   if (action === 'sync') return sync(flags)
   if (action === 'pull') return pull(file, flags)
-  throw new Error(`Unknown blocks action "${action}" (check, sync or pull)`)
+  if (action === 'report') return report(flags)
+  throw new Error(
+    `Unknown blocks action "${action}" (check, sync, pull or report)`,
+  )
 }
 
 export const registerBlocksCommands = (

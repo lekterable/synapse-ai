@@ -29,7 +29,7 @@ const cli = meow(
 	  sync [file]      Sync all tracked files or one file from source
 	  status           Show sync status of tracked files
 	  diff <file>      Show diff between source and project version
-	  blocks [action]  Shared blocks inside files: check (default), sync, pull <file>
+	  blocks [action]  Shared blocks inside files: check (default), sync, pull <file>, report
 
 	Options
 	  --help, -h              Show help
@@ -41,6 +41,7 @@ const cli = meow(
 	  --scope <name[,name]>   init: set the project scope; add, remove: target a scope
 	  --shared                add, remove: target the shared source root
 	  --repos <file>          blocks: repos from a projects.yaml-style list
+	  --json                  blocks report: print JSON for scripts
 
 	Examples
 	  $ synapse init
@@ -52,6 +53,7 @@ const cli = meow(
 	  $ synapse sync
 	  $ synapse sync --root apps/web --strategy theirs --yes
 	  $ synapse blocks check --repos ~/.config/projects.yaml
+	  $ synapse blocks report --json
 `,
   {
     importMeta: import.meta,
@@ -90,6 +92,9 @@ const cli = meow(
       repos: {
         type: 'string',
       },
+      json: {
+        type: 'boolean',
+      },
     },
   },
 )
@@ -105,6 +110,7 @@ const parseCliFlags = (flags: Record<string, unknown>): CliFlags => {
     scope: typeof flags.scope === 'string' ? flags.scope : undefined,
     shared: flags.shared === true,
     repos: typeof flags.repos === 'string' ? flags.repos : undefined,
+    json: flags.json === true,
   }
 }
 

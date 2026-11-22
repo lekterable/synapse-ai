@@ -137,6 +137,7 @@ In that setup:
 | `synapse blocks [check]`             | Compare shared blocks inside files with their source; exits 1 on drift     |
 | `synapse blocks sync`                | Rewrite drifted blocks from source (`--dry-run` to preview)                |
 | `synapse blocks pull <file>`         | Make a file's blocks the new source                                        |
+| `synapse blocks report`              | Show which repo carries which block (`--json` for scripts); read only      |
 
 ## Shared Blocks
 
@@ -163,7 +164,12 @@ synapse blocks check --repos ~/.config/projects.yaml
 
 # Bring them in line
 synapse blocks sync --repos ~/.config/projects.yaml
+
+# Which repo carries which block: yes, no, drifted, or no-source
+synapse blocks report --json
 ```
+
+`synapse blocks report` lists every block in the source, shared or scoped, and for each repo says whether it carries it in sync (`yes`), not at all (`no`), out of date in any file (`drifted`), or with no source for that repo's scope (`no-source`). A repo whose folder is gone shows as missing. It never writes and always exits 0; `--json` prints `{ "blocks": [...], "repos": [{ "repo", "missing", "blocks": { "<name>": "<state>" } }] }`.
 
 `--repos` takes a YAML list with a `root` folder and `repos` keyed by folder name under it. Without it, blocks covers the registered synapse projects.
 
@@ -178,7 +184,7 @@ A scope can add to a block. Put its part in `<sourcePath>/scopes/<scope>/blocks/
   scopes/turborepo/blocks/guides.md appended in repos scoped to turborepo
 ```
 
-A repo without `.synapse.json`, without a scope, or with a scope Synapse can't read gets the shared part only. Like scoped files, a composed scope folder must use the canonical name that `synapse add --scope` writes (`react+web`, sorted), or it is not read. `synapse blocks pull` refuses a block that has scoped parts, because one file's text can't be split back into them; edit those in the source instead.
+A repo without `.synapse.json`, without a scope, or with a scope Synapse can't read gets the shared part only. Like scoped files, a composed scope folder must use the canonical name that `synapse add --scope` writes (`react+web`, sorted), or it is not read. `synapse blocks pull` saves only the shared part of a block that has scoped parts: it takes the block minus the scoped parts the file's repo adds (the repo is the nearest folder with `.synapse.json`). If those scoped parts were edited too, it refuses that file, because the text can't be split back into them; edit scoped parts in the source instead.
 
 ## Status Symbols
 
@@ -209,7 +215,7 @@ A repo without `.synapse.json`, without a scope, or with a scope Synapse can't r
 11. `synapse sync` shows a sync plan and asks for confirmation before applying changes
 12. Before overwriting, backups are created in `~/.synapse/backups/`
 13. SHA256 hashes detect conflicts between source and local versions
-14. A symlink in the source syncs as the same symlink, so one skill can live in `.agents/skills/<name>/` with `.claude/skills/<name>` linking to it. The link must be relative and point at something that exists in the same layer (shared or one scope); other links are skipped with a warning, and a synced link never replaces a real directory in a project. Files keep their old behaviour: a project link to a file is compared by the file's content. `synapse add` stores what a link points to, not the link, so create links in the source by hand
+14. A symlink in the source syncs as the same symlink, so one skill can live in `.agents/skills/<name>/` with `.claude/skills/<name>` linking to it. The link must be relative and point at something that exists in the same layer (shared or one scope); a link to another link syncs only when that link does too. Other links are skipped with a warning, and a synced link never replaces a real directory in a project. Files keep their old behaviour: a project link to a file is compared by the file's content. `synapse add` stores what a link points to, not the link, so create links in the source by hand
 
 ## Shared vs Scoped
 
