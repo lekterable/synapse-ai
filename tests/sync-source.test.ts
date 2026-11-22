@@ -233,6 +233,27 @@ describe('synapse sync source contract', () => {
       /\.claude\/skills\/turborepo +in sync/,
     )
   })
+  it('should skip a link to a link that is itself skipped', async () => {
+    await writeSourceFile(sandbox.home, 'scopes/web/rules.md', 'rules\n')
+    await writeSourceFile(sandbox.home, 'outside.md', 'shared\n')
+    const layer = join(getSourceRoot(sandbox.home), 'scopes', 'web')
+    await symlink('../../outside.md', join(layer, 'escape.md'))
+    await symlink('escape.md', join(layer, 'chain.md'))
+    await symlink('rules.md', join(layer, 'alias.md'))
+    await symlink('alias.md', join(layer, 'chained-alias.md'))
+    expect(
+      runCli(sandbox.repo, sandbox.home, ['init', '--scope', 'web']).status,
+    ).toBe(0)
+
+    const result = runCli(sandbox.repo, sandbox.home, ['sync', '--yes'])
+
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain('Skipping chain.md')
+    await expect(lstat(join(sandbox.repo, 'chain.md'))).rejects.toThrow()
+    expect(
+      await readFile(join(sandbox.repo, 'chained-alias.md'), 'utf-8'),
+    ).toBe('rules\n')
+  })
   it('should keep a project link to a file that matches the source in sync', async () => {
     await writeSourceFile(sandbox.home, 'CLAUDE.md', 'rules\n')
     await writeFile(join(sandbox.repo, 'AGENTS.md'), 'rules\n', 'utf-8')
