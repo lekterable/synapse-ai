@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { blockSources, findBlocks, replaceBlocks } from '../src/blocks'
+import {
+  blockSources,
+  findBlocks,
+  replaceBlocks,
+  scopedBlockSources,
+} from '../src/blocks'
 
 const cliPath = join(process.cwd(), 'dist', 'cli.js')
 
@@ -82,6 +87,19 @@ describe('blocks', () => {
       'only-react': 'only react',
     })
     expect(blockSources(source, undefined)).toEqual({ guides: 'shared' })
+  })
+
+  it('should leave out a block whose scoped parts are all empty from the scoped parts', async () => {
+    const source = await mkdtemp(join(tmpdir(), 'synapse-block-source-'))
+    onTestFinished(() => rm(source, { recursive: true, force: true }))
+    await mkdir(join(source, 'scopes', 'react', 'blocks'), { recursive: true })
+    await writeFile(join(source, 'scopes', 'react', 'blocks', 'empty.md'), '\n')
+    await writeFile(
+      join(source, 'scopes', 'react', 'blocks', 'rules.md'),
+      'x\n',
+    )
+
+    expect(scopedBlockSources(source, 'react')).toEqual({ rules: 'x' })
   })
 
   it('should sync each repo with its own scope and treat an unreadable scope as none', async () => {

@@ -89,11 +89,17 @@ export const blockSources = (
 ): Record<string, string> =>
   joinParts([blocksDir(sourcePath), ...scopedDirs(sourcePath, scope)])
 
-// Only the scoped parts a repo with this scope adds, joined the same way.
+// Only the scoped parts a repo with this scope adds, joined the same way. A name whose parts
+// are all empty adds nothing, so it is left out.
 export const scopedBlockSources = (
   sourcePath: string,
   scope: string | undefined,
-): Record<string, string> => joinParts(scopedDirs(sourcePath, scope))
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(joinParts(scopedDirs(sourcePath, scope))).filter(
+      ([, text]) => text !== '',
+    ),
+  )
 
 // Every block name the source has, shared or added by any scope.
 export const blockNames = (sourcePath: string): string[] => {
