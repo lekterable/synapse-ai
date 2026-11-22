@@ -169,7 +169,18 @@ synapse blocks sync --repos ~/.config/projects.yaml
 synapse blocks report --json
 ```
 
-`synapse blocks report` lists every block in the source, shared or scoped, and for each repo says whether it carries it in sync (`yes`), not at all (`no`), out of date in any file (`drifted`), or with no source for that repo's scope (`no-source`). A repo whose folder is gone shows as missing. It never writes and always exits 0; `--json` prints `{ "blocks": [...], "repos": [{ "repo", "missing", "blocks": { "<name>": "<state>" } }] }`.
+`synapse blocks report` lists every block in the source, shared or scoped, and says for each repo whether it carries it:
+
+- `yes`: in sync in every file that carries it
+- `no`: no file carries it
+- `drifted`: out of date in at least one file
+- `no-source`: carried, but the repo's scope has no source for it
+
+A repo whose folder is gone shows as missing, with no states. The report never writes and always exits 0; `blocks check` is the one that exits 1 on drift. `--json` prints the same data:
+
+```json
+{ "blocks": ["conventions"], "repos": [{ "repo": "/path/app", "missing": false, "blocks": { "conventions": "yes" } }] }
+```
 
 `--repos` takes a YAML list with a `root` folder and `repos` keyed by folder name under it. Without it, blocks covers the registered synapse projects.
 
@@ -184,7 +195,7 @@ A scope can add to a block. Put its part in `<sourcePath>/scopes/<scope>/blocks/
   scopes/turborepo/blocks/guides.md appended in repos scoped to turborepo
 ```
 
-A repo without `.synapse.json`, without a scope, or with a scope Synapse can't read gets the shared part only. Like scoped files, a composed scope folder must use the canonical name that `synapse add --scope` writes (`react+web`, sorted), or it is not read. `synapse blocks pull` saves only the shared part of a block that has scoped parts: it takes the block minus the scoped parts the file's repo adds (the repo is the nearest folder with `.synapse.json`). If those scoped parts were edited too, it refuses that file, because the text can't be split back into them; edit scoped parts in the source instead.
+A repo without `.synapse.json`, without a scope, or with a scope Synapse can't read gets the shared part only. Like scoped files, a composed scope folder must use the canonical name that `synapse add --scope` writes (`react+web`, sorted), or it is not read. `synapse blocks pull` saves only the shared part of a block that has scoped parts: it takes the block minus the scoped parts the file's repo adds (the repo is the nearest folder with `.synapse.json`). A block that is only its scoped parts saves nothing. If the block no longer ends with those scoped parts (they were edited, or the source changed since the last `blocks sync`), it refuses that file, because the text can't be split back into them; edit scoped parts in the source instead.
 
 ## Status Symbols
 

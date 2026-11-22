@@ -29,7 +29,12 @@ const cli = meow(
 	  sync [file]      Sync all tracked files or one file from source
 	  status           Show sync status of tracked files
 	  diff <file>      Show diff between source and project version
-	  blocks [action]  Shared blocks inside files: check (default), sync, pull <file>, report
+	  blocks [action]  Shared blocks inside files:
+	                     check (default)  compare with the source; exits 1 on drift
+	                     sync             rewrite drifted blocks from the source
+	                     pull <file>      make a file's blocks the new source
+	                     report           read only: per repo, yes, no, drifted or
+	                                      no-source for each block; always exits 0
 
 	Options
 	  --help, -h              Show help

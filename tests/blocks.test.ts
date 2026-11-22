@@ -146,7 +146,7 @@ describe('blocks', () => {
     expect(run('check', '--repos', repos).status).toBe(0)
   })
 
-  it('should pull the shared part of a stacked block and refuse an edited scoped part', async () => {
+  it('should pull the shared part of a block with scoped parts and refuse an edited scoped part', async () => {
     const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
     onTestFinished(() => rm(root, { recursive: true, force: true }))
     const home = join(root, 'home')
@@ -186,8 +186,50 @@ describe('blocks', () => {
     await writeFile(file, doc('shared v3\n\nreact rules, edited'))
     const refused = pull()
     expect(refused.status).toBe(1)
-    expect(refused.stderr).toContain('conventions has edited scoped parts')
+    expect(refused.stderr).toContain(
+      'conventions does not end with the scoped parts',
+    )
     expect(await shared()).toBe('shared v2\n')
+  })
+
+  it('should not create a shared part when pulling a block that is only scoped parts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'synapse-blocks-'))
+    onTestFinished(() => rm(root, { recursive: true, force: true }))
+    const home = join(root, 'home')
+    const source = join(home, '.synapse', 'source')
+    await mkdir(join(source, 'scopes', 'react', 'blocks'), { recursive: true })
+    await writeFile(
+      join(source, 'scopes', 'react', 'blocks', 'conventions.md'),
+      'react rules\n',
+    )
+    const app = join(root, 'app')
+    await mkdir(app, { recursive: true })
+    await writeFile(
+      join(app, '.synapse.json'),
+      JSON.stringify({
+        version: 1,
+        scope: 'react',
+        syncedFiles: {},
+        fileHashes: {},
+      }),
+    )
+    await writeFile(join(app, 'AGENTS.md'), doc('react rules'))
+
+    const pull = spawnSync(
+      'node',
+      [cliPath, 'blocks', 'pull', join(app, 'AGENTS.md')],
+      {
+        cwd: root,
+        encoding: 'utf-8',
+        env: { ...process.env, HOME: home, NO_COLOR: '1' },
+      },
+    )
+
+    expect(pull.status).toBe(0)
+    expect(pull.stdout).toContain('kept  conventions')
+    await expect(
+      readFile(join(source, 'blocks', 'conventions.md'), 'utf8'),
+    ).rejects.toThrow()
   })
 
   it('should report which repo carries each block, as a table or JSON', async () => {
@@ -210,6 +252,10 @@ describe('blocks', () => {
     )
     await writeFile(join(repo('app'), 'AGENTS.md'), doc('shared'))
     await writeFile(join(repo('lib'), 'CLAUDE.md'), doc('old'))
+    await writeFile(
+      join(repo('bare'), 'AGENTS.md'),
+      '<!-- synapse:effect -->\nmine\n<!-- /synapse:effect -->\n',
+    )
     const repos = join(root, 'projects.yaml')
     await writeFile(
       repos,
@@ -244,12 +290,12 @@ describe('blocks', () => {
         {
           repo: repo('bare'),
           missing: false,
-          blocks: { conventions: 'no', effect: 'no' },
+          blocks: { conventions: 'no', effect: 'no-source' },
         },
         {
           repo: repo('gone'),
           missing: true,
-          blocks: { conventions: 'no', effect: 'no' },
+          blocks: {},
         },
       ],
     })

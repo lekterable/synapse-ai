@@ -95,16 +95,26 @@ const pull = (file: string | undefined, flags: CliFlags): void => {
   const edited = parts.filter(({ shared }) => shared === undefined)
   if (edited.length > 0)
     throw new Error(
-      `${edited.map(({ name }) => name).join(', ')} ${edited.length === 1 ? 'has' : 'have'} edited scoped parts, so edit ${edited.length === 1 ? 'it' : 'them'} in ${sourcePath} instead`,
+      `${edited.map(({ name }) => name).join(', ')} ${edited.length === 1 ? 'does' : 'do'} not end with the scoped parts in ${sourcePath}: edit scoped parts there, or run "synapse blocks sync" first if the source changed`,
     )
   const dir = blocksDir(sourcePath)
+  // A block that is only its scoped parts has no shared part to save; writing an empty one
+  // would give every other repo an empty source for it.
+  const saved = parts.filter(
+    ({ name, shared }) => shared !== '' || existsSync(join(dir, `${name}.md`)),
+  )
   if (!flags.dryRun) mkdirSync(dir, { recursive: true })
-  parts.forEach(({ name, shared = '' }) => {
+  saved.forEach(({ name, shared }) => {
     if (!flags.dryRun) writeFileSync(join(dir, `${name}.md`), `${shared}\n`)
     print(
       `${flags.dryRun ? 'would save' : 'saved'}  ${name} → ${join(dir, `${name}.md`)}`,
     )
   })
+  parts
+    .filter((part) => !saved.includes(part))
+    .forEach(({ name }) =>
+      print(`kept  ${name}: it has only scoped parts, nothing shared to save`),
+    )
 }
 
 type Carried = 'yes' | 'no' | 'drifted' | 'no-source'
@@ -131,18 +141,26 @@ const report = (flags: CliFlags): void => {
   const repos = reposFor(flags)
   const names = blockNames(createConfigManager().getSourcePath())
   const states = blockStates(repos, sourcesByRepo(repos))
-  const rows = repos.map((repo) => ({
-    repo,
-    missing: !existsSync(repo),
-    blocks: Object.fromEntries(
-      names.map((name) => [
-        name,
-        carried(
-          states.filter((state) => state.repo === repo && state.name === name),
-        ),
-      ]),
-    ),
-  }))
+  // A repo whose folder is gone gets no states, so its blocks never read as "no".
+  const rows = repos.map((repo) => {
+    const missing = !existsSync(repo)
+    return {
+      repo,
+      missing,
+      blocks: missing
+        ? {}
+        : Object.fromEntries(
+            names.map((name) => [
+              name,
+              carried(
+                states.filter(
+                  (state) => state.repo === repo && state.name === name,
+                ),
+              ),
+            ]),
+          ),
+    }
+  })
   if (flags.json) {
     print(JSON.stringify({ blocks: names, repos: rows }, undefined, 2))
     return
@@ -173,8 +191,10 @@ const report = (flags: CliFlags): void => {
       [
         (labels[row] ?? '').padEnd(width),
         ...names.map((name, index) => {
-          const state = blocks[name] ?? 'no'
-          return paint[state](state.padEnd(widths[index] ?? 0))
+          const state: Carried | undefined = blocks[name]
+          return state === undefined
+            ? '-'.padEnd(widths[index] ?? 0)
+            : paint[state](state.padEnd(widths[index] ?? 0))
         }),
       ]
         .join('')
