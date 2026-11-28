@@ -1,4 +1,4 @@
-# Agent Guidelines: Commit Messages
+# Agent guide
 
 ## Format (REQUIRED)
 
