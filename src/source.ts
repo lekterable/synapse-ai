@@ -149,7 +149,7 @@ const listSourceFiles = async (
     }),
   )
 
-  return nestedFiles.flat().sort((a, b) => a.localeCompare(b))
+  return nestedFiles.flat().sort((left, right) => left.localeCompare(right))
 }
 
 const removeEmptyParentDirectories = async (
@@ -187,7 +187,9 @@ const parseScopeParts = (scope: string): string[] => {
     )
   }
 
-  return [...new Set(scopeParts)].sort((a, b) => a.localeCompare(b))
+  return [...new Set(scopeParts)].sort((left, right) =>
+    left.localeCompare(right),
+  )
 }
 
 const normalizeScope = (scope: string): string => {
@@ -378,7 +380,7 @@ export const listEffectiveSourceFiles = async (
   ).flat()
 
   return [...new Map([...sharedEntries, ...scopedEntries]).values()].sort(
-    (a, b) => a.file.localeCompare(b.file),
+    (left, right) => left.file.localeCompare(right.file),
   )
 }
 
