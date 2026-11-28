@@ -280,7 +280,7 @@ const listCustomCheckerPaths = async (
           entry.name.endsWith('.cjs')),
     )
     .map((entry) => join(checksPath, entry.name))
-    .sort((a, b) => a.localeCompare(b))
+    .sort((left, right) => left.localeCompare(right))
 }
 
 const runCustomChecker = async (

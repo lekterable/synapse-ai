@@ -493,5 +493,5 @@ export const detectConflicts = async (
 
   return statuses
     .filter((status): status is FileStatusInfo => status !== undefined)
-    .sort((a, b) => a.file.localeCompare(b.file))
+    .sort((left, right) => left.file.localeCompare(right.file))
 }
